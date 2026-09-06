@@ -252,6 +252,86 @@ async def test_left_right_switches_to_the_neighbouring_menu() -> None:
         assert app.query_one("#help", Menu).armed is True
 
 
+# ---------------------------------------------------------- mouse over the bar
+
+
+async def test_hovering_a_title_in_the_bar_only_stage_arms_it() -> None:
+    """`app.screen.query_one` cannot resolve the bar's titles once a modal
+    stage is pushed -- they live on the screen underneath -- so every mouse
+    test below hovers/clicks by screen offset instead of by selector."""
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        help_region = app.query_one("#help", Menu).region
+        await pilot.hover(offset=(help_region.x, help_region.y))
+        await settle(pilot)
+        assert app.query_one("#help", Menu).armed is True
+        assert app.query_one("#file", Menu).armed is False
+
+
+async def test_clicking_a_different_title_in_the_bar_only_stage_opens_it() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        help_region = app.query_one("#help", Menu).region
+        await pilot.click(offset=(help_region.x, help_region.y))
+        await settle(pilot)
+        assert isinstance(app.screen, MenuDropdown)
+        assert app.query_one("#help", Menu).armed is True
+
+
+async def test_clicking_off_every_title_in_the_bar_only_stage_closes_it() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.click(offset=(0, 10))
+        await settle(pilot)
+        assert app.query_one(MenuBar).display is False
+
+
+async def test_hovering_another_title_while_a_dropdown_is_open_switches_menus() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("enter")
+        await settle(pilot)
+        assert isinstance(app.screen, MenuDropdown)
+        help_region = app.query_one("#help", Menu).region
+        await pilot.hover(offset=(help_region.x, help_region.y))
+        await settle(pilot)
+        assert isinstance(app.screen, MenuDropdown)
+        assert app.query_one("#help", Menu).armed is True
+
+
+async def test_clicking_the_open_menus_own_title_closes_it() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("enter")
+        await settle(pilot)
+        file_region = app.query_one("#file", Menu).region
+        await pilot.click(offset=(file_region.x, file_region.y))
+        await settle(pilot)
+        assert app.query_one(MenuBar).display is False
+
+
+async def test_clicking_off_the_bar_and_the_dropdown_closes_it() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("enter")
+        await settle(pilot)
+        await pilot.click(offset=(70, 20))
+        await settle(pilot)
+        assert app.query_one(MenuBar).display is False
+
+
 # ------------------------------------------------------------------- items
 
 

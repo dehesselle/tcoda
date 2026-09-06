@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, ClassVar
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
+from textual.geometry import Offset
 from textual.screen import ModalScreen
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
@@ -35,7 +36,24 @@ class OpenNeighbor:
     direction: int  # -1 or 1
 
 
-MenuDropdownResult = MenuItem | OpenNeighbor | None
+#: A dropdown or the bar-only stage may also be dismissed with a specific
+#: `Menu` to jump to -- how the mouse asks for what Left/Right asks for with
+#: `OpenNeighbor`, since a click or hover can land on any title, not just a
+#: neighbouring one.
+MenuDropdownResult = MenuItem | OpenNeighbor | Menu | None
+
+
+def _menu_at(menus: list[Menu], offset: Offset) -> Menu | None:
+    """Which of `menus`, if any, occupies screen position `offset`.
+
+    Both modal screens below sit directly on top of the bar's own screen, so
+    a `Menu` title's `region` -- computed by that screen's last layout -- is
+    still in the same coordinate space as a mouse event's `screen_offset`.
+    """
+    for menu in menus:
+        if menu.region.contains(*offset):
+            return menu
+    return None
 
 
 class MenuBarSelectScreen(ModalScreen[Menu | None]):
@@ -89,6 +107,18 @@ class MenuBarSelectScreen(ModalScreen[Menu | None]):
                 self.dismiss(menu)
                 return
 
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        if menu is not None and menu is not self._armed:
+            self._armed = menu
+            self._menu_bar.set_armed(menu)
+
+    def on_click(self, event: events.Click) -> None:
+        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        # A click off every title closes the bar, matching Escape -- there is
+        # nothing else on this screen a click could sensibly mean.
+        self.dismiss(menu)
+
 
 class MenuDropdown(ModalScreen[MenuDropdownResult]):
     """A single pulldown menu's contents, positioned under its title."""
@@ -112,8 +142,14 @@ class MenuDropdown(ModalScreen[MenuDropdownResult]):
         Binding("right", "neighbor(1)", "Next menu", show=False),
     ]
 
-    def __init__(self, menu: Menu, *, x_offset: int) -> None:
+    def __init__(self, menu_bar: MenuBar, menu: Menu, *, x_offset: int) -> None:
+        # `menu_bar` is passed in for the same reason `MenuBarSelectScreen`
+        # takes it: it is what lets hovering or clicking a *different* title
+        # jump straight to it, and a plain `menu.parent` lookup would need a
+        # runtime import of `MenuBar` that `_menubar.py` importing this
+        # module the other way round rules out.
         super().__init__()
+        self._menu_bar = menu_bar
         self._menu = menu
         self._entries = menu.entries
         self._x_offset = x_offset
@@ -152,6 +188,28 @@ class MenuDropdown(ModalScreen[MenuDropdownResult]):
 
     def action_neighbor(self, direction: int) -> None:
         self.dismiss(OpenNeighbor(direction))
+
+    def _title_at(self, offset: Offset) -> Menu | None:
+        # The OptionList handles its own hover/click; only a title in the bar
+        # above it is this screen's business.
+        if self.query_one(OptionList).region.contains(*offset):
+            return None
+        return _menu_at(self._menu_bar.menus, offset)
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        menu = self._title_at(event.screen_offset)
+        if menu is not None and menu is not self._menu:
+            self.dismiss(menu)
+
+    def on_click(self, event: events.Click) -> None:
+        if self.query_one(OptionList).region.contains(*event.screen_offset):
+            return
+        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        # Clicking the open menu's own title closes it, like clicking an
+        # already-pressed toggle button; clicking a different title jumps to
+        # it; clicking anywhere else (there is nothing else on this screen)
+        # closes it, same as Escape.
+        self.dismiss(None if menu is self._menu else menu)
 
     def on_key(self, event: events.Key) -> None:
         character = event.character

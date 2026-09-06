@@ -202,12 +202,15 @@ class MenuBar(Widget, can_focus=False):
         while True:
             self.set_armed(menu)
             result = await self.app.push_screen_wait(
-                MenuDropdown(menu, x_offset=menu.region.x)
+                MenuDropdown(self, menu, x_offset=menu.region.x)
             )
             if isinstance(result, OpenNeighbor):
                 menus = self.menus
                 index = menus.index(menu)
                 menu = menus[(index + result.direction) % len(menus)]
+                continue
+            if isinstance(result, Menu):
+                menu = result
                 continue
             if isinstance(result, MenuItem) and not result.disabled:
                 await self._chose(result)
