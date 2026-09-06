@@ -44,29 +44,6 @@ class DialogScreen(ModalScreen[ResultT]):
     DialogScreen > #dialog > #buttons Button {
         margin: 0 0 0 1;
     }
-
-    /* The unstyled (default) variant defaults to $surface, which sits so
-       close to the screen background and to $panel that it visually
-       disappears next to a -primary sibling. Bump it up the existing gray
-       ramp instead of introducing a new color.
-       Marked explicitly with a "button-gray" class from the call site rather
-       than matched by variant: a "default" variant Button's `variant`
-       reactive is declared with "default" as its initial value, and Textual
-       only calls watch_variant() on an actual change, so a button that is
-       never given another variant never gets a "-default" class added at all
-       -- there is no selector meaning "whichever variant this is, it isn't
-       -primary/-success/-warning/-error", since Textual's CSS has no :not().
-       Background only, no border override: a compact button forces
-       `border: none !important` in its own DEFAULT_CSS, so a border rule
-       here would put a border back specifically on compact gray buttons
-       while their compact -primary sibling stays borderless. */
-    DialogScreen Button.button-gray {
-        background: $surface-lighten-3;
-
-        &:hover {
-            background: $surface-lighten-1;
-        }
-    }
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [

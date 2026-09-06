@@ -69,7 +69,7 @@ class ConfirmScreen(DialogScreen[bool]):
                     variant="error" if self._danger else "primary",
                     id="confirm-yes",
                 )
-                yield Button(self._cancel_label, id="confirm-no", classes="button-gray")
+                yield Button(self._cancel_label, id="confirm-no")
 
     def on_mount(self) -> None:
         target = "#confirm-no" if self._focus_cancel else "#confirm-yes"

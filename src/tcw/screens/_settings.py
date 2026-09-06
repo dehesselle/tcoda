@@ -101,13 +101,9 @@ class SettingsScreen(DialogScreen[None]):
                 with VerticalScroll(id="settings-content"):
                     yield Label("Select a settings group.", id="settings-placeholder")
             with Horizontal(id="buttons"):
-                yield Button(
-                    "Apply", compact=True, id="settings-apply", classes="button-gray"
-                )
+                yield Button("Apply", compact=True, id="settings-apply")
                 yield Button("OK", variant="primary", compact=True, id="settings-ok")
-                yield Button(
-                    "Cancel", compact=True, id="settings-cancel", classes="button-gray"
-                )
+                yield Button("Cancel", compact=True, id="settings-cancel")
 
     def on_mount(self) -> None:
         tree = self.query_one("#settings-tree", Tree)
