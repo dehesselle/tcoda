@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+src/tcw/version.py
 
 # Virtual environments
 .venv

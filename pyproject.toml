@@ -1,20 +1,21 @@
 [project]
 name = "tcw"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Textual Common Widgets: a menu bar and a settings system shared across Textual apps"
 readme = "README.md"
-authors = [
-    { name = "René de Hesselle", email = "dehesselle@web.de" }
-]
+authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
-dependencies = [
-    "platformdirs>=4.11.0",
-    "textual>=8.2.8",
-]
+dependencies = ["platformdirs>=4.11.0", "textual>=8.2.8"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/tcw/version.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -23,7 +24,4 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-]
+dev = ["pytest>=9.1.1", "pytest-asyncio>=1.4.0"]
