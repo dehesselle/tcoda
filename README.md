@@ -88,9 +88,13 @@ the dialog takes effect without a restart.
 
 - `group` may be dotted (`"Updates.Runner"`), which materialises the parent
   node in the dialog's tree.
-- `Setting(instance=True)` scopes a value to `config.current_instance` (a host,
-  an account, a profile) instead of storing it globally; such settings are
-  hidden entirely while no instance is active.
+- `Setting(per_instance=True)` scopes a value to `config.current_instance`
+  (a host, an account, a profile) instead of storing it globally; such
+  settings are hidden entirely while no instance is active, and are marked in
+  the dialog so a reader can tell the value differs elsewhere. *That* they are
+  marked is the library's business; what the mark looks like is the app's --
+  override `SettingsScreen.INSTANCE_GLYPH` and `INSTANCE_STYLE` (a Rich style,
+  or `None` for the running theme's accent) in a subclass.
 - `SettingAction` is a dialog row with no stored value — a button that runs a
   callback immediately. Its `callback` takes no arguments, because entries
   register at import time, long before any screen exists.

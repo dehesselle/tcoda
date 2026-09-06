@@ -72,7 +72,7 @@ class Setting[T: (bool, int, float, str)]:
     #: Scoped per active instance (a host, an account, a profile -- whatever
     #: the app switches between) rather than global. See
     #: `ConfigStore.current_instance`.
-    instance: bool = False
+    per_instance: bool = False
 
     def __post_init__(self) -> None:
         value_type = type(self.default)
@@ -105,8 +105,8 @@ class SettingAction:
     group: str
     button_label: str
     callback: Callable[[], None]
-    #: Only offered while an instance is active. See `Setting.instance`.
-    instance: bool = False
+    #: Only offered while an instance is active. See `Setting.per_instance`.
+    per_instance: bool = False
 
     def __post_init__(self) -> None:
         _register(self)
@@ -145,7 +145,7 @@ class ConfigStore:
         self._app_name = app_name
         self._values: dict[str, Any] = {}
         self._loaded = False
-        #: Which instance's values `instance=True` settings resolve against --
+        #: Which instance's values `per_instance=True` settings resolve against --
         #: the host/account/profile currently on screen, or None before one is
         #: active. The app is the only writer.
         self.current_instance: str | None = None
@@ -196,7 +196,7 @@ class ConfigStore:
         get/reset)."""
         if not self._loaded:
             self.load()
-        if not setting.instance:
+        if not setting.per_instance:
             return self._values
         if self.current_instance is None:
             raise ValueError(
@@ -248,7 +248,7 @@ class ConfigStore:
         if bucket is None or setting.key not in bucket:
             return
         del bucket[setting.key]
-        if setting.instance and not bucket:
+        if setting.per_instance and not bucket:
             instances = self._values[INSTANCES_KEY]
             del instances[self.current_instance]
             if not instances:

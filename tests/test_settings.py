@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from rich.cells import cell_len
 
+from tcw._text import marker_text
 from tcw.settings import (
     ConfigStore,
     Setting,
@@ -65,7 +67,7 @@ def _instance_setting() -> Setting[str]:
         description="",
         group="G",
         default="",
-        instance=True,
+        per_instance=True,
     )
 
 
@@ -235,3 +237,23 @@ def test_configure_points_the_global_store_at_a_file(tmp_path: Path) -> None:
     config.set(ttl, 5)
     assert json.loads(config.path.read_text(encoding="utf-8")) == {"ttl": 5}
     assert config.path.parent == tmp_path
+
+
+# ---------------------------------------------------------------- rendering
+
+
+def test_a_marker_and_its_absence_are_the_same_width() -> None:
+    """A wider glyph must still leave unmarked rows lined up with marked
+    ones -- the blank is measured from the glyph, not assumed to be one cell.
+    """
+    for glyph in ("◐", "⚠️", "**"):
+        marked = marker_text(glyph, "cyan", present=True)
+        blank = marker_text(glyph, "cyan", present=False)
+        assert cell_len(marked.plain) == cell_len(blank.plain)
+        assert blank.plain.strip() == ""
+
+
+def test_a_marker_carries_the_style_it_was_given() -> None:
+    """`tcw` picks no colour of its own; the caller resolves one."""
+    marked = marker_text("◐", "bold magenta", present=True)
+    assert marked.style == "bold magenta"

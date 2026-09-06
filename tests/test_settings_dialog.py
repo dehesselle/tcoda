@@ -6,6 +6,7 @@ import asyncio
 import json
 
 import pytest
+from rich.cells import cell_len
 from textual.app import App
 from textual.pilot import Pilot
 from textual.widgets import Button, Input, Label, Switch, Tree
@@ -211,7 +212,7 @@ def _declare_instance_setting() -> Setting[str]:
         description="Which runners to seed from.",
         group="Instance",
         default="",
-        instance=True,
+        per_instance=True,
     )
 
 
@@ -243,3 +244,63 @@ async def test_an_instance_setting_appears_once_an_instance_is_active() -> None:
             "instances": {"host.a": {"runners": "1,2"}}
         }
         assert config.get(setting) == "1,2"
+
+
+# ------------------------------------------------------------------ markers
+
+
+async def test_a_per_instance_row_is_marked_and_a_global_one_is_padded() -> None:
+    """The mark says "this value differs per instance"; the blank keeps the
+    two kinds of row aligned with each other."""
+    Setting(key="ttl", label="ttl", description="", group="G", default=900)
+    Setting(
+        key="runners",
+        label="runner ids",
+        description="",
+        group="G",
+        default="",
+        per_instance=True,
+    )
+    config.current_instance = "host.a"
+    app = Harness()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await settle(pilot)
+        rendered = [
+            str(label.render()) for label in app.screen.query("#settings-content Label")
+        ]
+        marked = next(t for t in rendered if t.strip() == "◐ runner ids")
+        plain = next(t for t in rendered if t.strip() == "ttl")
+        assert marked.startswith("◐ ")
+        # Same indent either way, which is the whole point of the blank.
+        assert cell_len(marked) - cell_len("runner ids") == cell_len(plain) - cell_len(
+            "ttl"
+        )
+
+
+async def test_the_marker_can_be_restyled_by_the_app() -> None:
+    """tcw owns *that* there is a marker; the app owns what it looks like."""
+
+    class Restyled(SettingsScreen):
+        INSTANCE_GLYPH = "*"
+        INSTANCE_STYLE = "bold magenta"
+
+    class RestyledHarness(App[None]):
+        def on_mount(self) -> None:
+            self.push_screen(Restyled())
+
+    Setting(
+        key="runners",
+        label="runner ids",
+        description="",
+        group="G",
+        default="",
+        per_instance=True,
+    )
+    config.current_instance = "host.a"
+    app = RestyledHarness()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await settle(pilot)
+        rendered = [
+            str(label.render()) for label in app.screen.query("#settings-content Label")
+        ]
+        assert any(text.startswith("* runner ids") for text in rendered)

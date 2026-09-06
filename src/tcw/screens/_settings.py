@@ -18,7 +18,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Label, Rule, Switch, Tree
 from textual.widgets.tree import TreeNode
 
-from tcw._text import instance_glyph
+from tcw._text import marker_text
 from tcw.screens._confirm import ConfirmScreen
 from tcw.screens._dialog import DialogScreen
 from tcw.settings import Setting, SettingAction, SettingsEntry, all_settings, config
@@ -84,6 +84,16 @@ class SettingsScreen(DialogScreen[None]):
         Binding("escape", "cancel", "Cancel", show=False),
     ]
 
+    #: Marks a row whose value is scoped to `ConfigStore.current_instance`
+    #: rather than stored globally. That such rows are marked at all is the
+    #: library's business -- the value really does differ elsewhere, and the
+    #: reader has to be able to tell. What the mark looks like is the app's,
+    #: so both of these are here to be overridden in a subclass.
+    INSTANCE_GLYPH: ClassVar[str] = "◐"
+    #: A Rich style for that glyph, or None for the running theme's accent --
+    #: the same highlight the menu bar gives a mnemonic.
+    INSTANCE_STYLE: ClassVar[str | None] = None
+
     def __init__(self) -> None:
         super().__init__()
         self._current_node: TreeNode[str] | None = None
@@ -125,7 +135,7 @@ class SettingsScreen(DialogScreen[None]):
         return [
             entry
             for entry in all_settings()
-            if not entry.instance or config.current_instance is not None
+            if not entry.per_instance or config.current_instance is not None
         ]
 
     def _entries_for(self, group: str) -> list[SettingsEntry]:
@@ -149,6 +159,10 @@ class SettingsScreen(DialogScreen[None]):
         add_children(tree.root, "")
 
     # --------------------------------------------------------------- widgets
+
+    def _marker(self, entry: SettingsEntry) -> Text:
+        style = self.INSTANCE_STYLE or self.app.theme_variables["accent"]
+        return marker_text(self.INSTANCE_GLYPH, style, present=entry.per_instance)
 
     def _widget_for(self, entry: SettingsEntry) -> ValueWidget:
         widget = self.query_one(f"#value-{entry.key}")
@@ -183,9 +197,7 @@ class SettingsScreen(DialogScreen[None]):
             item = Vertical(
                 Label(entry.description, classes="settings-item-description"),
                 Horizontal(
-                    Label(
-                        Text.assemble(instance_glyph(entry.instance), " ", entry.label)
-                    ),
+                    Label(Text.assemble(self._marker(entry), " ", entry.label)),
                     self._make_value_widget(entry),
                     classes="settings-item-field",
                 ),

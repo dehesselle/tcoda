@@ -1,7 +1,13 @@
-"""Small Rich-text helpers shared by the menu bar and the settings dialog."""
+"""Small Rich-text helpers shared by the menu bar and the settings dialog.
+
+Neither hardcodes a colour: `mnemonic_text` reads the running app's theme
+accent, and `marker_text` takes whatever style the caller resolved. `tcw`
+ships no palette of its own.
+"""
 
 from __future__ import annotations
 
+from rich.cells import cell_len
 from rich.style import Style
 from rich.text import Text
 from textual.app import App
@@ -21,9 +27,13 @@ def mnemonic_text(label: str, index: int, app: App) -> Text:
     return text
 
 
-def instance_glyph(is_instance: bool) -> Text:
-    """Marks a settings row as scoped to the active instance, with a blank
-    placeholder of equal width so global rows stay aligned with it."""
-    if not is_instance:
-        return Text(" ", style="dim")
-    return Text("◐", style="cyan")
+def marker_text(glyph: str, style: str, *, present: bool) -> Text:
+    """A row marker, or a blank of the same width when the row has none.
+
+    The blank is measured from the glyph rather than assumed to be one cell,
+    so a two-cell marker (an emoji, say) still leaves unmarked rows aligned
+    with marked ones.
+    """
+    if not present:
+        return Text(" " * cell_len(glyph))
+    return Text(glyph, style=style)
