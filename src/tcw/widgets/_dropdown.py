@@ -131,7 +131,7 @@ class MenuDropdown(ModalScreen[MenuDropdownResult]):
         width: 32;
         height: auto;
         max-height: 15;
-        border: round $primary;
+        border: round $border;
         background: $surface;
     }
     """

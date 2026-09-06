@@ -28,7 +28,7 @@ class DialogScreen(ModalScreen[ResultT]):
     }
     DialogScreen > #dialog {
         height: auto;
-        border: round $primary;
+        border: thick $background 80%;
         background: $surface;
         padding: 1 2;
     }
