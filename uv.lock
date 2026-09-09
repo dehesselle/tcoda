@@ -150,7 +150,6 @@ wheels = [
 
 [[package]]
 name = "tcw"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "platformdirs" },

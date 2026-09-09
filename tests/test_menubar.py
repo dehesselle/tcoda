@@ -395,6 +395,26 @@ async def test_a_disabled_item_cannot_be_chosen_by_its_mnemonic() -> None:
         assert app.pressed == []
 
 
+async def test_pressing_a_disabled_item_directly_does_nothing() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.query_one("#locked", MenuItem).press()
+        await pilot.pause()
+        assert app.pressed == []
+
+
+async def test_a_disabled_items_mnemonic_is_not_colored() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("enter")
+        await settle(pilot)
+        option_list = app.screen.query_one(OptionList)
+        assert option_list.get_option("open").prompt.spans
+        assert not option_list.get_option("locked").prompt.spans
+
+
 # ------------------------------------------------------------- notification
 
 

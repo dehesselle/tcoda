@@ -125,12 +125,14 @@ class MenuItem(Widget):
     def press(self) -> None:
         """Post `Pressed` as though the item had been chosen. `MenuBar` calls
         this; an app may too, to route a key binding through the same path."""
+        if self.disabled:
+            return
         self.post_message(self.Pressed(self, self.menu))
 
     # ------------------------------------------------------------ rendering
 
     def _label_text(self, app: App) -> Text:
-        if self.mnemonic is None:
+        if self.mnemonic is None or self.disabled:
             return Text(self.label)
         return mnemonic_text(
             self.label, self.label.lower().find(self.mnemonic.lower()), app
