@@ -15,7 +15,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Input, Label, Rule, Switch, Tree
+from textual.widgets import Button, Input, Label, Rule, Select, Switch, Tree
 from textual.widgets.tree import TreeNode
 
 from tcw._text import marker_text
@@ -23,7 +23,7 @@ from tcw.screens._confirm import ConfirmScreen
 from tcw.screens._dialog import DialogScreen
 from tcw.settings import Setting, SettingAction, SettingsEntry, all_settings, config
 
-ValueWidget = Input | Switch | Button
+ValueWidget = Input | Switch | Select | Button
 
 
 def _group_paths(entries: list[SettingsEntry]) -> set[str]:
@@ -166,7 +166,7 @@ class SettingsScreen(DialogScreen[None]):
 
     def _widget_for(self, entry: SettingsEntry) -> ValueWidget:
         widget = self.query_one(f"#value-{entry.key}")
-        assert isinstance(widget, Input | Switch | Button)
+        assert isinstance(widget, Input | Switch | Select | Button)
         return widget
 
     def _make_value_widget(self, entry: SettingsEntry) -> ValueWidget:
@@ -174,6 +174,21 @@ class SettingsScreen(DialogScreen[None]):
             return Button(entry.button_label, compact=True, id=f"value-{entry.key}")
         if isinstance(entry.default, bool):
             return Switch(value=config.get(entry), id=f"value-{entry.key}")
+        if entry.choices is not None:
+            current = config.get(entry)
+            # Select requires its initial value to be one of the options --
+            # a hand-edited settings.json, or an old default no longer
+            # offered, must not crash the dialog, so it's shown as an extra
+            # trailing choice rather than dropped.
+            values = list(entry.choices)
+            if current not in values:
+                values.append(current)
+            return Select(
+                [(entry.format(v), v) for v in values],
+                value=current,
+                allow_blank=False,
+                id=f"value-{entry.key}",
+            )
         return Input(
             value=entry.format(config.get(entry)),
             placeholder=entry.format(entry.default),
@@ -224,7 +239,7 @@ class SettingsScreen(DialogScreen[None]):
         ValueError if typed text does not parse. Empty text means "reset to
         the default", which `ConfigStore.set` turns into a removal."""
         widget = self._widget_for(setting)
-        if isinstance(widget, Switch):
+        if isinstance(widget, Switch | Select):
             return widget.value
         assert isinstance(widget, Input)
         text = widget.value.strip()

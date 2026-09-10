@@ -73,6 +73,10 @@ class Setting[T: (bool, int, float, str)]:
     #: the app switches between) rather than global. See
     #: `ConfigStore.current_instance`.
     per_instance: bool = False
+    #: When set, the dialog offers exactly these values (a `Select`) instead
+    #: of free text. `None`, not an empty tuple, means "unconstrained" -- a
+    #: setting always holds some value, so zero choices would be nonsensical.
+    choices: tuple[T, ...] | None = None
 
     def __post_init__(self) -> None:
         value_type = type(self.default)

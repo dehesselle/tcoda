@@ -165,6 +165,20 @@ def test_a_boolean_formats_back_to_something_it_can_parse() -> None:
     assert flag.parse(flag.format(True)) is True
 
 
+def test_choices_default_to_none() -> None:
+    """None, not an empty tuple, is "unconstrained" -- the dialog falls back
+    to a free-typed Input for any setting that doesn't opt into a Select."""
+    setting = Setting(key="x", label="x", description="", group="G", default=1)
+    assert setting.choices is None
+
+
+def test_a_setting_can_declare_a_fixed_set_of_choices() -> None:
+    setting = Setting(
+        key="x", label="x", description="", group="G", default=1, choices=(1, 2, 3)
+    )
+    assert setting.choices == (1, 2, 3)
+
+
 # ------------------------------------------------------------ instance scope
 
 

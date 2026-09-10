@@ -9,7 +9,7 @@ import pytest
 from rich.cells import cell_len
 from textual.app import App
 from textual.pilot import Pilot
-from textual.widgets import Button, Input, Label, Switch, Tree
+from textual.widgets import Button, Input, Label, Select, Switch, Tree
 
 from tcw.screens import ConfirmScreen, SettingsScreen
 from tcw.settings import Setting, SettingAction, config
@@ -166,6 +166,51 @@ async def test_a_boolean_setting_gets_a_switch(declared) -> None:
         tree.select_node(next(iter(updates.children)))
         await settle(pilot)
         assert isinstance(app.screen.query_one("#value-verbose"), Switch)
+
+
+def _declare_pool_size(default: int = 3) -> Setting[int]:
+    return Setting(
+        key="pool_size",
+        label="pool size",
+        description="How many connections.",
+        group="Connection",
+        default=default,
+        choices=(1, 2, 3, 4, 5),
+    )
+
+
+async def test_a_choice_setting_renders_a_select() -> None:
+    _declare_pool_size()
+    app = Harness()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await settle(pilot)
+        select = app.screen.query_one("#value-pool_size", Select)
+        assert select.value == 3
+
+
+async def test_selecting_a_choice_and_clicking_ok_persists_it() -> None:
+    setting = _declare_pool_size()
+    app = Harness()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await settle(pilot)
+        app.screen.query_one("#value-pool_size", Select).value = 5
+        await pilot.click("#settings-ok")
+        await settle(pilot)
+        assert json.loads(config.path.read_text(encoding="utf-8")) == {"pool_size": 5}
+        assert config.get(setting) == 5
+
+
+async def test_a_stored_value_outside_choices_is_still_shown() -> None:
+    """A hand-edited settings.json, or an old default no longer offered,
+    must not crash the dialog -- Select requires its initial value to be one
+    of its options, so an out-of-range value is added as an extra one."""
+    setting = _declare_pool_size()
+    config.set(setting, 9)
+    app = Harness()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await settle(pilot)
+        select = app.screen.query_one("#value-pool_size", Select)
+        assert select.value == 9
 
 
 async def test_an_ancestor_group_says_it_has_nothing_of_its_own(declared) -> None:
