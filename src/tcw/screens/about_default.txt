@@ -1,0 +1,9 @@
+    __
+   |  |_.----.--.--.--.     Textual Common Widgets
+   |   _|  __|  |  |  |
+   |____|____|________|
+
+Shared widgets and dialogs for our Textual apps.
+
+Pass AboutScreen(path=...) — or AboutMenuItem(path=...) —
+to show your own about-text instead of this placeholder.

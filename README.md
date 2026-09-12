@@ -148,6 +148,33 @@ the dialog takes effect without a restart.
 into a menu as `SettingsMenuItem`), plus the `DialogScreen` chrome and the
 `ConfirmScreen` it uses for its unsaved-changes guard.
 
+## About dialog
+
+A small modal that reads its text from a file: the first five lines are a
+fixed header (never scrolled — a logo or tagline), everything after that is
+a scrollable body capped at ten lines, so the dialog never grows past
+fifteen lines or 57 columns wide.
+
+```python
+from tcw.widgets import AboutMenuItem
+
+
+class MainScreen(Screen):
+    def compose(self) -> ComposeResult:
+        with MenuBar():
+            with Menu("Help", id="help"):
+                yield AboutMenuItem(path="myapp/about.txt")
+```
+
+- **`path` is optional.** Omit it and `AboutScreen` shows a bundled
+  placeholder — useful before an app has written its own about-text, or in
+  tests. `AboutMenuItem(path=...)` passes it straight through.
+- **Pushed directly, without a menu item**, with
+  `self.app.push_screen(AboutScreen(path="myapp/about.txt"))`.
+- **`escape` dismisses it** — inherited from `DialogScreen`, like every
+  other dialog here. There is no button row; this dialog only ever
+  dismisses, nothing to confirm.
+
 ## Conventions
 
 All styling is inline `DEFAULT_CSS` — a library cannot rely on a consumer's
