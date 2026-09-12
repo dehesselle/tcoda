@@ -17,6 +17,7 @@ other Textual widget's::
         ...
 """
 
+from tcw.widgets._header import Header, HeaderArea
 from tcw.widgets._log_viewer import TOGGLE_ACTION, LogViewer
 from tcw.widgets._menubar import OPEN_ACTION, MenuBar
 from tcw.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
@@ -25,6 +26,8 @@ from tcw.widgets._settings_item import SettingsMenuItem
 __all__ = [
     "OPEN_ACTION",
     "TOGGLE_ACTION",
+    "Header",
+    "HeaderArea",
     "LogViewer",
     "Menu",
     "MenuAction",
