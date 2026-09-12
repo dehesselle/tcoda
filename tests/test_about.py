@@ -11,7 +11,7 @@ from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widgets import Static
 
-from tcw.screens import AboutScreen
+from tcw.dialogs import AboutDialog
 from tcw.widgets import AboutMenuItem, Menu, MenuBar
 
 # The only literal prose in the bundled header -- the "tcw" above it is
@@ -27,7 +27,7 @@ class Harness(App[None]):
         self._path = path
 
     def on_mount(self) -> None:
-        self.push_screen(AboutScreen(self._path))
+        self.push_screen(AboutDialog(self._path))
 
 
 async def settle(pilot: Pilot[None], rounds: int = 3) -> None:
@@ -94,7 +94,7 @@ async def test_escape_dismisses_the_dialog() -> None:
         await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
-        assert not isinstance(app.screen, AboutScreen)
+        assert not isinstance(app.screen, AboutDialog)
 
 
 async def test_the_menu_item_opens_the_about_dialog() -> None:
@@ -110,4 +110,4 @@ async def test_the_menu_item_opens_the_about_dialog() -> None:
         await settle(pilot)
         await pilot.press("a")
         await settle(pilot)
-        assert isinstance(app.screen, AboutScreen)
+        assert isinstance(app.screen, AboutDialog)

@@ -19,7 +19,7 @@ from tcw.widgets import (
     MenuItem,
     MenuSeparator,
 )
-from tcw.widgets._dropdown import MenuBarSelectScreen, MenuDropdown
+from tcw.widgets._dropdown import MenuBarOverlay, MenuDropdown
 
 
 def _menus() -> ComposeResult:
@@ -190,7 +190,7 @@ async def test_f9_opens_the_bar_only_stage_armed_on_the_first_menu() -> None:
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.press("f9")
         await settle(pilot)
-        assert isinstance(app.screen, MenuBarSelectScreen)
+        assert isinstance(app.screen, MenuBarOverlay)
         assert app.query_one("#file", Menu).armed is True
         assert app.query_one("#help", Menu).armed is False
 
@@ -202,7 +202,7 @@ async def test_arrowing_moves_the_armed_title_without_opening_it() -> None:
         await settle(pilot)
         await pilot.press("right")
         await settle(pilot)
-        assert isinstance(app.screen, MenuBarSelectScreen)
+        assert isinstance(app.screen, MenuBarOverlay)
         assert app.query_one("#help", Menu).armed is True
 
 

@@ -38,7 +38,7 @@ class MainScreen(Screen):
     @on(MenuItem.Pressed, "#open")
     @work
     async def _open(self) -> None:
-        await self.app.push_screen_wait(OpenScreen())
+        await self.app.push_screen_wait(OpenDialog())
 ```
 
 - **Choosing an item posts `MenuItem.Pressed`**, which bubbles item → `Menu` →
@@ -135,7 +135,7 @@ the dialog takes effect without a restart.
   settings are hidden entirely while no instance is active, and are marked in
   the dialog so a reader can tell the value differs elsewhere. *That* they are
   marked is the library's business; what the mark looks like is the app's --
-  override `SettingsScreen.INSTANCE_GLYPH` and `INSTANCE_STYLE` (a Rich style,
+  override `SettingsDialog.INSTANCE_GLYPH` and `INSTANCE_STYLE` (a Rich style,
   or `None` for the running theme's accent) in a subclass.
 - `SettingAction` is a dialog row with no stored value — a button that runs a
   callback immediately. Its `callback` takes no arguments, because entries
@@ -144,9 +144,9 @@ the dialog takes effect without a restart.
   a module behind an optional extra hides it from the dialog while its stored
   value lingers. Declare them somewhere always imported.
 
-`tcw.screens` also publishes `SettingsScreen` (pushed on demand, or dropped
-into a menu as `SettingsMenuItem`), plus the `DialogScreen` chrome and the
-`ConfirmScreen` it uses for its unsaved-changes guard.
+`tcw.dialogs` also publishes `SettingsDialog` (pushed on demand, or dropped
+into a menu as `SettingsMenuItem`), plus the `Dialog` chrome and the
+`ConfirmDialog` it uses for its unsaved-changes guard.
 
 ## About dialog
 
@@ -166,14 +166,14 @@ class MainScreen(Screen):
                 yield AboutMenuItem(path="myapp/about.txt")
 ```
 
-- **`path` is optional.** Omit it and `AboutScreen` shows a bundled
+- **`path` is optional.** Omit it and `AboutDialog` shows a bundled
   placeholder — useful before an app has written its own about-text, or in
   tests. `AboutMenuItem(path=...)` passes it straight through.
 - **Pushed directly, without a menu item**, with
-  `self.app.push_screen(AboutScreen(path="myapp/about.txt"))`.
-- **`escape` dismisses it** — inherited from `DialogScreen`, like every
-  other dialog here. There is no button row; this dialog only ever
-  dismisses, nothing to confirm.
+  `self.app.push_screen(AboutDialog(path="myapp/about.txt"))`.
+- **`escape` dismisses it** — inherited from `Dialog`, like every other
+  dialog here. There is no button row; this dialog only ever dismisses,
+  nothing to confirm.
 
 ## Conventions
 
@@ -181,3 +181,16 @@ All styling is inline `DEFAULT_CSS` — a library cannot rely on a consumer's
 `CSS_PATH`. Textual scopes it to the declaring widget's subtree, and an app's
 own stylesheet outranks it regardless of specificity, so anything here can be
 overridden.
+
+Modal classes are named for what they are, not for the base class they
+extend. A **`Dialog`** is a centered box that asks something and dismisses
+with a result — `AboutDialog`, `ConfirmDialog`, `SettingsDialog`, and
+whatever a consuming app adds. `MenuBarOverlay` and `MenuDropdown` are *not*
+dialogs: they are transparent, render no chrome of their own, and exist only
+to capture input while a menu is in use. **`Screen`** stays reserved for a
+host app's own screens, such as its main one.
+
+Textual has no `Dialog` of its own — its vocabulary stops at `Screen` and
+`ModalScreen` — but it does not claim the term either, and everyone who has
+met Qt, GTK or wxWidgets already knows what a dialog is. The word carries
+more than the suffix did.

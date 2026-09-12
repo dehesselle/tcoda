@@ -1,10 +1,12 @@
 """The two modal stages of using the menu bar.
 
-Midnight-Commander style, and staged on purpose: `MenuBarSelectScreen`
-highlights a title without showing its items yet, so a mnemonic letter can
-never be ambiguous between "pick a top-level menu" and "pick an item" the way
-it would be if a dropdown were already open. `MenuDropdown` is the second
-stage.
+Midnight-Commander style, and staged on purpose: `MenuBarOverlay` highlights
+a title without showing its items yet, so a mnemonic letter can never be
+ambiguous between "pick a top-level menu" and "pick an item" the way it would
+be if a dropdown were already open. `MenuDropdown` is the second stage.
+
+Neither is a dialog: both are transparent, render no chrome of their own, and
+exist only to capture the keyboard and mouse while a menu is in use.
 
 Both are internal to `MenuBar`, which is the only thing that pushes them.
 """
@@ -56,11 +58,11 @@ def _menu_at(menus: list[Menu], offset: Offset) -> Menu | None:
     return None
 
 
-class MenuBarSelectScreen(ModalScreen[Menu | None]):
+class MenuBarOverlay(ModalScreen[Menu | None]):
     """The bar-only stage: arrow or type a letter to pick a title."""
 
     DEFAULT_CSS = """
-    MenuBarSelectScreen {
+    MenuBarOverlay {
         background: transparent;
     }
     """
@@ -143,11 +145,11 @@ class MenuDropdown(ModalScreen[MenuDropdownResult]):
     ]
 
     def __init__(self, menu_bar: MenuBar, menu: Menu, *, x_offset: int) -> None:
-        # `menu_bar` is passed in for the same reason `MenuBarSelectScreen`
-        # takes it: it is what lets hovering or clicking a *different* title
-        # jump straight to it, and a plain `menu.parent` lookup would need a
-        # runtime import of `MenuBar` that `_menubar.py` importing this
-        # module the other way round rules out.
+        # `menu_bar` is passed in for the same reason `MenuBarOverlay` takes
+        # it: it is what lets hovering or clicking a *different* title jump
+        # straight to it, and a plain `menu.parent` lookup would need a runtime
+        # import of `MenuBar` that `_menubar.py` importing this module the
+        # other way round rules out.
         super().__init__()
         self._menu_bar = menu_bar
         self._menu = menu

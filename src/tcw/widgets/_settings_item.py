@@ -26,8 +26,8 @@ class SettingsMenuItem(MenuItem):
         )
 
     async def _open(self) -> None:
-        # Imported here rather than at module scope: tcw.screens imports the
+        # Imported here rather than at module scope: tcw.dialogs imports the
         # settings machinery, and tcw.widgets must stay importable without it.
-        from tcw.screens import SettingsScreen
+        from tcw.dialogs import SettingsDialog
 
-        await self.app.push_screen_wait(SettingsScreen())
+        await self.app.push_screen_wait(SettingsDialog())

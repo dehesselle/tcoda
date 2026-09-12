@@ -16,7 +16,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcw.widgets._dropdown import MenuBarSelectScreen, MenuDropdown, OpenNeighbor
+from tcw.widgets._dropdown import MenuBarOverlay, MenuDropdown, OpenNeighbor
 from tcw.widgets._menuitem import Menu, MenuItem
 
 #: The action `MenuBar` installs on its screen, and therefore the name to use
@@ -188,7 +188,7 @@ class MenuBar(Widget, can_focus=False):
         try:
             if menu is None:
                 menu = await self.app.push_screen_wait(
-                    MenuBarSelectScreen(self, self.menus[0])
+                    MenuBarOverlay(self, self.menus[0])
                 )
                 if menu is None:
                     return

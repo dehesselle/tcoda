@@ -30,9 +30,9 @@ class AboutMenuItem(MenuItem):
         self._path = path
 
     async def _open(self) -> None:
-        # Imported here rather than at module scope: tcw.screens imports the
+        # Imported here rather than at module scope: tcw.dialogs imports the
         # about-dialog machinery, and tcw.widgets must stay importable
         # without it (same reasoning as SettingsMenuItem).
-        from tcw.screens import AboutScreen
+        from tcw.dialogs import AboutDialog
 
-        await self.app.push_screen_wait(AboutScreen(self._path))
+        await self.app.push_screen_wait(AboutDialog(self._path))

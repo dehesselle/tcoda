@@ -11,7 +11,7 @@ from textual.app import App
 from textual.pilot import Pilot
 from textual.widgets import Button, Input, Label, Select, Switch, Tree
 
-from tcw.screens import ConfirmScreen, SettingsScreen
+from tcw.dialogs import ConfirmDialog, SettingsDialog
 from tcw.settings import Setting, SettingAction, config
 
 
@@ -19,7 +19,7 @@ class Harness(App[None]):
     """Pushes the dialog on mount, the way a menu item does."""
 
     def on_mount(self) -> None:
-        self.push_screen(SettingsScreen())
+        self.push_screen(SettingsDialog())
 
 
 async def settle(pilot: Pilot[None], rounds: int = 3) -> None:
@@ -90,7 +90,7 @@ async def test_ok_writes_the_edited_value_and_closes(declared) -> None:
         await pilot.click("#settings-ok")
         await settle(pilot)
         assert json.loads(config.path.read_text(encoding="utf-8")) == {"cache_ttl": 60}
-        assert not isinstance(app.screen, SettingsScreen)
+        assert not isinstance(app.screen, SettingsDialog)
 
 
 async def test_apply_persists_without_closing(declared) -> None:
@@ -101,7 +101,7 @@ async def test_apply_persists_without_closing(declared) -> None:
         await pilot.click("#settings-apply")
         await settle(pilot)
         assert json.loads(config.path.read_text(encoding="utf-8")) == {"cache_ttl": 60}
-        assert isinstance(app.screen, SettingsScreen)
+        assert isinstance(app.screen, SettingsDialog)
 
 
 async def test_clearing_a_field_resets_it_to_its_default(declared) -> None:
@@ -123,7 +123,7 @@ async def test_an_unparsable_value_blocks_ok_and_saves_nothing(declared) -> None
         app.screen.query_one("#value-cache_ttl", Input).value = "soon"
         await pilot.click("#settings-ok")
         await settle(pilot)
-        assert isinstance(app.screen, SettingsScreen)
+        assert isinstance(app.screen, SettingsDialog)
         assert not config.path.exists()
 
 
@@ -135,7 +135,7 @@ async def test_leaving_a_group_with_edits_asks_before_discarding(declared) -> No
         tree = app.screen.query_one("#settings-tree", Tree)
         tree.select_node(list(tree.root.children)[1])
         await settle(pilot)
-        assert isinstance(app.screen, ConfirmScreen)
+        assert isinstance(app.screen, ConfirmDialog)
 
 
 async def test_cancelling_without_edits_just_closes(declared) -> None:
@@ -144,7 +144,7 @@ async def test_cancelling_without_edits_just_closes(declared) -> None:
         await settle(pilot)
         await pilot.click("#settings-cancel")
         await settle(pilot)
-        assert not isinstance(app.screen, SettingsScreen)
+        assert not isinstance(app.screen, SettingsDialog)
 
 
 async def test_cancelling_with_edits_asks_first(declared) -> None:
@@ -154,7 +154,7 @@ async def test_cancelling_with_edits_asks_first(declared) -> None:
         app.screen.query_one("#value-cache_ttl", Input).value = "60"
         await pilot.click("#settings-cancel")
         await settle(pilot)
-        assert isinstance(app.screen, ConfirmScreen)
+        assert isinstance(app.screen, ConfirmDialog)
 
 
 async def test_a_boolean_setting_gets_a_switch(declared) -> None:
@@ -244,7 +244,7 @@ async def test_an_action_renders_a_button_that_fires_immediately() -> None:
         await settle(pilot)
         assert fired == [1]
         # It has no value, so it neither closes the dialog nor dirties it.
-        assert isinstance(app.screen, SettingsScreen)
+        assert isinstance(app.screen, SettingsDialog)
 
 
 # ----------------------------------------------------------------- instance
@@ -325,7 +325,7 @@ async def test_a_per_instance_row_is_marked_and_a_global_one_is_padded() -> None
 async def test_the_marker_can_be_restyled_by_the_app() -> None:
     """tcw owns *that* there is a marker; the app owns what it looks like."""
 
-    class Restyled(SettingsScreen):
+    class Restyled(SettingsDialog):
         INSTANCE_GLYPH = "*"
         INSTANCE_STYLE = "bold magenta"
 

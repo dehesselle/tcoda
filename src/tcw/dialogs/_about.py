@@ -16,21 +16,21 @@ from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Static
 
-from tcw.screens._dialog import DialogScreen
+from tcw.dialogs._dialog import Dialog
 
 _HEADER_LINES = 5
 
 
-class AboutScreen(DialogScreen[None]):
+class AboutDialog(Dialog[None]):
     DEFAULT_CSS = """
-    AboutScreen > #dialog {
+    AboutDialog > #dialog {
         width: 57;
         max-width: 100%;
     }
-    AboutScreen #about-header {
+    AboutDialog #about-header {
         height: auto;
     }
-    AboutScreen #about-body {
+    AboutDialog #about-body {
         height: auto;
         max-height: 10;
     }
@@ -57,7 +57,7 @@ class AboutScreen(DialogScreen[None]):
             text = self._path.read_text(encoding="utf-8")
         else:
             text = (
-                files("tcw.screens")
+                files("tcw.dialogs")
                 .joinpath("about_default.txt")
                 .read_text(encoding="utf-8")
             )

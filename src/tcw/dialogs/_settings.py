@@ -19,8 +19,8 @@ from textual.widgets import Button, Input, Label, Rule, Select, Switch, Tree
 from textual.widgets.tree import TreeNode
 
 from tcw._text import marker_text
-from tcw.screens._confirm import ConfirmScreen
-from tcw.screens._dialog import DialogScreen
+from tcw.dialogs._confirm import ConfirmDialog
+from tcw.dialogs._dialog import Dialog
 from tcw.settings import Setting, SettingAction, SettingsEntry, all_settings, config
 
 ValueWidget = Input | Switch | Select | Button
@@ -39,7 +39,7 @@ def _group_paths(entries: list[SettingsEntry]) -> set[str]:
     return paths
 
 
-class SettingsScreen(DialogScreen[None]):
+class SettingsDialog(Dialog[None]):
     """Tree of setting groups on the left, the selected group's editable
     entries on the right. Edits to the visible group are unsaved until
     Apply/OK; navigating to a different group with unsaved edits confirms
@@ -47,37 +47,37 @@ class SettingsScreen(DialogScreen[None]):
     """
 
     DEFAULT_CSS = """
-    SettingsScreen > #dialog { width: 90%; height: 80%; }
+    SettingsDialog > #dialog { width: 90%; height: 80%; }
 
-    SettingsScreen #settings-body { height: 1fr; }
+    SettingsDialog #settings-body { height: 1fr; }
 
-    SettingsScreen #settings-tree {
+    SettingsDialog #settings-tree {
         width: 1fr;
         border-right: solid $panel;
         padding: 0 1;
     }
 
-    SettingsScreen #settings-content { width: 3fr; padding: 1 2; }
+    SettingsDialog #settings-content { width: 3fr; padding: 1 2; }
 
-    SettingsScreen #settings-placeholder,
-    SettingsScreen .settings-empty { color: $text-muted; }
+    SettingsDialog #settings-placeholder,
+    SettingsDialog .settings-empty { color: $text-muted; }
 
-    SettingsScreen .settings-item { height: auto; }
+    SettingsDialog .settings-item { height: auto; }
 
-    SettingsScreen .settings-item-description { width: 1fr; margin-bottom: 1; }
+    SettingsDialog .settings-item-description { width: 1fr; margin-bottom: 1; }
 
     /* Separates entries; its own default margin (1 0) is the only spacing
        between one entry and the next. */
-    SettingsScreen #settings-content Rule { color: $panel; }
+    SettingsDialog #settings-content Rule { color: $panel; }
 
-    SettingsScreen .settings-item-field { height: auto; }
+    SettingsDialog .settings-item-field { height: auto; }
 
     /* Input/Switch are both 3 cells tall (bordered), so the label's top
        margin lines it up with their middle row. A compact Button is 1 cell
        tall, so it needs the same margin to sit on that row too. */
-    SettingsScreen .settings-item-field Label { width: auto; margin: 1 1 0 0; }
-    SettingsScreen .settings-item-field Input { width: 1fr; }
-    SettingsScreen .settings-item-field Button { margin: 1 0 0 0; }
+    SettingsDialog .settings-item-field Label { width: auto; margin: 1 1 0 0; }
+    SettingsDialog .settings-item-field Input { width: 1fr; }
+    SettingsDialog .settings-item-field Button { margin: 1 0 0 0; }
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -305,7 +305,7 @@ class SettingsScreen(DialogScreen[None]):
         # decorator provides) -- it cannot be awaited from a plain handler.
         if self._is_dirty():
             discard = await self.app.push_screen_wait(
-                ConfirmScreen("You are about to lose unsaved changes!")
+                ConfirmDialog("You are about to lose unsaved changes!")
             )
             if not discard:
                 if self._current_node is not None:
@@ -342,7 +342,7 @@ class SettingsScreen(DialogScreen[None]):
         # Same worker-context reason as _handle_selection above.
         if self._is_dirty():
             discard = await self.app.push_screen_wait(
-                ConfirmScreen("You are about to lose unsaved changes!")
+                ConfirmDialog("You are about to lose unsaved changes!")
             )
             if not discard:
                 return

@@ -21,27 +21,29 @@ from textual.screen import ModalScreen
 ResultT = TypeVar("ResultT")
 
 
-class DialogScreen(ModalScreen[ResultT]):
+class Dialog(ModalScreen[ResultT]):
+    """A centered modal that asks something and dismisses with a result."""
+
     DEFAULT_CSS = """
-    DialogScreen {
+    Dialog {
         align: center middle;
     }
-    DialogScreen > #dialog {
+    Dialog > #dialog {
         height: auto;
         border: thick $background 80%;
         background: $surface;
         padding: 1 2;
     }
-    DialogScreen > #dialog > #title {
+    Dialog > #dialog > #title {
         text-style: bold;
         width: 100%;
         content-align: center middle;
     }
-    DialogScreen > #dialog > #buttons {
+    Dialog > #dialog > #buttons {
         height: auto;
         align-horizontal: right;
     }
-    DialogScreen > #dialog > #buttons Button {
+    Dialog > #dialog > #buttons Button {
         margin: 0 0 0 1;
     }
     """

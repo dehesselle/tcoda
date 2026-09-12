@@ -12,19 +12,19 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Label, Static
 
-from tcw.screens._dialog import DialogScreen
+from tcw.dialogs._dialog import Dialog
 
 
-class ConfirmScreen(DialogScreen[bool]):
+class ConfirmDialog(Dialog[bool]):
     """Ask a yes/no question. Dismisses `True` for the confirm button,
     `False` for the cancel button or escape."""
 
     DEFAULT_CSS = """
-    ConfirmScreen > #dialog {
+    ConfirmDialog > #dialog {
         width: 60;
         max-width: 100%;
     }
-    ConfirmScreen #confirm-message {
+    ConfirmDialog #confirm-message {
         margin: 1 0;
     }
     """
