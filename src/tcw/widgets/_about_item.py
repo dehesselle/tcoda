@@ -23,11 +23,13 @@ class AboutMenuItem(MenuItem):
         mnemonic: str | None = "a",
         shortcut: str | None = None,
         path: str | Path | None = None,
+        variables: dict[str, str] | None = None,
     ) -> None:
         super().__init__(
             label, id=id, mnemonic=mnemonic, shortcut=shortcut, action=self._open
         )
         self._path = path
+        self._variables = variables
 
     async def _open(self) -> None:
         # Imported here rather than at module scope: tcw.dialogs imports the
@@ -35,4 +37,6 @@ class AboutMenuItem(MenuItem):
         # without it (same reasoning as SettingsMenuItem).
         from tcw.dialogs import AboutDialog
 
-        await self.app.push_screen_wait(AboutDialog(self._path))
+        await self.app.push_screen_wait(
+            AboutDialog(self._path, variables=self._variables)
+        )
