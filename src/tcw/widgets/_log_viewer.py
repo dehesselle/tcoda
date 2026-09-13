@@ -214,8 +214,8 @@ class LogViewer(Widget, can_focus=False):
             self._key_description,
             show=self._show_key,
         )
-        ours = bindings.key_to_bindings.pop(self._key)
-        bindings.key_to_bindings = {self._key: ours, **bindings.key_to_bindings}
+        # Ordering is the app's call, via `Footer(pinned=(TOGGLE_ACTION,))` --
+        # see MenuBar.on_mount.
         screen.refresh_bindings()
 
     def _attach_handler(self) -> None:

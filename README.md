@@ -13,6 +13,81 @@ dependencies = ["tcw>=0.1"]
 tcw = { path = "../tcw", editable = true }
 ```
 
+## Header
+
+A single line docked to the top, with independently clickable left, middle and
+right areas. Styled like Textual's own `Header`, but with no icon and no clock,
+and the middle tracks the app/screen title live until `show_title=False`.
+
+```python
+from tcw.widgets import Header, HeaderArea
+
+
+class MainScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header(left="MyApp", right="v1.0")
+
+    @on(HeaderArea.Clicked, "#header-left")
+    def _left_clicked(self) -> None:
+        ...
+```
+
+- **The areas are equal thirds**, not docked to their content, so the middle
+  stays centered on the screen however much text the other two hold. The
+  trade-off is that all three ellipsize at a third of the width.
+- **Later updates go through the area**, `header.left.update("Connected")`,
+  rather than through setters on `Header`.
+
+## Footer
+
+Textual's `Footer` renders `screen.active_bindings` in focus-chain order, so
+every key shifts whenever focus moves, and there is nowhere to put anything
+that is not a key. This one splits the row into three areas — pinned keys, the
+rest, and a status corner — each of which is optional. Left alone, it behaves
+like the stock footer.
+
+```python
+from tcw.widgets import Countdown, Footer, OPEN_ACTION
+
+
+class MainScreen(Screen):
+    def compose(self) -> ComposeResult:
+        with Footer(pinned=(OPEN_ACTION, "ctrl+q"), sort=True):
+            yield Countdown(id="footer-countdown")
+```
+
+- **`pinned=` keys render leftmost, in the order given**, whatever the focus
+  chain says. Each entry matches a binding's `id`, then its `action`, then its
+  key — so `pinned=(OPEN_ACTION,)` pins a `MenuBar` whose key the app changed,
+  where `pinned=("f9",)` would silently pin nothing.
+- **A pinned binding renders even if it was declared `show=False`.** Naming a
+  key is an explicit request to show it, and it has to be: Textual's own
+  `ctrl+q` Quit is `show=False`, which is why no stock footer has ever shown
+  it. A pin whose binding goes inactive keeps its slot, dimmed, rather than
+  letting every pin after it shift — but a pin that has *never* been active
+  has no description to draw yet and renders nothing.
+- **`^p` gets no special treatment.** It is an app-level binding like any
+  other, and it is declared `show=False`, so it does not appear unless pinned.
+- **`sort=True` orders the unpinned keys** by displayed key, comparing digit
+  runs as numbers so `f2` comes before `f10`; pass a callable over
+  `FooterEntry` for anything else. Pins are never sorted — `pinned` already
+  states their order. Worth knowing before turning it on: focus-chain order is
+  not noise, it puts the most contextual keys first.
+- **The status corner holds widgets, not just text.** Whatever is yielded into
+  the footer lands there and is *never rebuilt*, so it keeps its own state —
+  hold the reference and set attributes on it. There is no status channel,
+  because none is needed once the widget survives. `footer.status.update(text)`
+  sets a label alongside, without disturbing them.
+- **Hide a status widget with `display`**, not by rendering an empty string —
+  the dividers follow `display`, and a countdown that blanks at zero cannot
+  express the difference between "zero seconds left" and "switched off".
+- **Dividers appear only between areas that both have content**, drawn with
+  Textual's own `border-left: vkey` rather than a character.
+- **`Binding.Group` is ignored**; grouped bindings render as individual keys.
+
+`Countdown` is published separately and depends on nothing here — put one
+wherever a wait needs a number. It runs its own spinner: set `refreshing`.
+
 ## Menu bar
 
 A Midnight-Commander style pulldown bar: hidden until used, opened with F9 or
@@ -56,7 +131,9 @@ class MainScreen(Screen):
   resolving a key, so a bar that is never focused cannot own one. The action is
   called `open_menubar`, so something other than the key (a clickable key bar,
   say) reaches it with `run_action("screen.open_menubar")`. Pass `key=None` to
-  bind it yourself.
+  bind it yourself. Where the key *appears* is not the bar's business: pin it
+  with `Footer(pinned=(OPEN_ACTION,))`. Under a stock `Footer` it lands in
+  focus-chain order like anything else.
 - **Ids are CSS ids.** Textual only needs a `MenuItem` id to be unique among
   one menu's children, but an app stylesheet rule of the same name will style
   it — which, for a widget inside a one-row bar, shows up as a garbled bar

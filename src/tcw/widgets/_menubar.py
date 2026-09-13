@@ -128,11 +128,10 @@ class MenuBar(Widget, can_focus=False):
             self._key_description,
             show=self._show_key,
         )
-        # Moved to the front of the map, because the footer renders bindings
-        # in insertion order and a menu key belongs at the head of it -- the
-        # screen declared its own bindings long before this ran.
-        ours = bindings.key_to_bindings.pop(self._key)
-        bindings.key_to_bindings = {self._key: ours, **bindings.key_to_bindings}
+        # Where the key *appears* is not this widget's business: `tcw.widgets.
+        # Footer(pinned=(OPEN_ACTION,))` puts it wherever the app wants it, and
+        # does it properly -- reordering the screen's own map, as this used to,
+        # still left any binding on the focused widget sorting ahead of it.
         screen.refresh_bindings()
 
     # -------------------------------------------------------------- display

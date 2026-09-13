@@ -18,6 +18,14 @@ other Textual widget's::
 """
 
 from tcw.widgets._about_item import AboutMenuItem
+from tcw.widgets._countdown import Countdown
+from tcw.widgets._footer import (
+    Footer,
+    FooterBinding,
+    FooterEntry,
+    FooterStatus,
+    sort_by_key,
+)
 from tcw.widgets._header import Header, HeaderArea
 from tcw.widgets._log_viewer import TOGGLE_ACTION, LogViewer
 from tcw.widgets._menubar import OPEN_ACTION, MenuBar
@@ -28,6 +36,11 @@ __all__ = [
     "OPEN_ACTION",
     "TOGGLE_ACTION",
     "AboutMenuItem",
+    "Countdown",
+    "Footer",
+    "FooterBinding",
+    "FooterEntry",
+    "FooterStatus",
     "Header",
     "HeaderArea",
     "LogViewer",
@@ -38,4 +51,5 @@ __all__ = [
     "MenuItem",
     "MenuSeparator",
     "SettingsMenuItem",
+    "sort_by_key",
 ]

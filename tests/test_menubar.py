@@ -14,6 +14,8 @@ from textual.screen import Screen
 from textual.widgets import OptionList, Static
 
 from tcw.widgets import (
+    OPEN_ACTION,
+    Footer,
     Menu,
     MenuBar,
     MenuItem,
@@ -495,24 +497,43 @@ async def test_the_key_is_bound_on_the_screen_the_bar_is_mounted_on() -> None:
         assert "f9" in app.screen.active_bindings
 
 
-async def test_the_key_leads_the_footer() -> None:
-    """Installed at mount, so it would otherwise land after every binding the
-    screen declared -- and a menu key belongs at the head of a footer."""
+async def test_the_key_can_be_pinned_to_the_head_of_the_footer() -> None:
+    """Where the key *appears* is the app's call, not the bar's.
 
-    class WithBindings(App[None]):
+    `MenuBar` used to re-insert its key at the front of the screen's own
+    binding map so a stock footer would render it first. That only ever
+    reordered the screen's bindings, so anything on the focused widget still
+    sorted ahead of it -- which is the case exercised here, and the reason
+    pinning replaced the trick outright.
+    """
+
+    class Focusable(Static, can_focus=True):
         BINDINGS: ClassVar[list[Binding]] = [Binding("r", "refresh", "Refresh")]
-
-        def compose(self) -> ComposeResult:
-            with MenuBar(), Menu("File", id="file"):
-                yield MenuItem("Open...", id="open")
 
         def action_refresh(self) -> None:
             pass
 
+    class WithBindings(App[None]):
+        def compose(self) -> ComposeResult:
+            with MenuBar(), Menu("File", id="file"):
+                yield MenuItem("Open...", id="open")
+            yield Focusable("body")
+            yield Footer(pinned=(OPEN_ACTION,))
+
     app = WithBindings()
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        assert next(iter(app.screen.active_bindings)) == "f9"
+        await settle(pilot)
+        app.query_one(Focusable).focus()
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        assert [
+            widget.key_display
+            for widget in footer.query("#footer-pinned FooterBinding")
+        ] == ["f9"]
+        # The focused widget's own key is present, and behind the pin.
+        assert "r" in [
+            widget.key_display for widget in footer.query("#footer-keys FooterBinding")
+        ]
 
 
 async def test_f9_works_when_the_bar_is_on_a_pushed_screen() -> None:
