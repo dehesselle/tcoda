@@ -472,6 +472,48 @@ async def test_toggle_key_none_installs_no_binding(logger_name: str) -> None:
         assert "f1" not in app.screen.active_bindings
 
 
+# ------------------------------------------------------------- focus chain
+
+
+async def test_concealed_panel_contributes_nothing_to_the_focus_chain(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        chain = app.screen.focus_chain
+        assert app.query_one("#log-viewer-level") not in chain
+        assert app.query_one("#log-viewer-sources") not in chain
+        assert app.query_one("#log-viewer-log") not in chain
+
+
+async def test_revealed_panel_puts_its_controls_back_in_the_focus_chain(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await reveal(pilot)
+        chain = app.screen.focus_chain
+        assert app.query_one("#log-viewer-level") in chain
+        assert app.query_one("#log-viewer-sources") in chain
+        assert app.query_one("#log-viewer-log") in chain
+
+
+async def test_concealing_while_a_toolbar_control_is_focused_clears_focus(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await reveal(pilot)
+        app.query_one("#log-viewer-level", Select).focus()
+        await pilot.pause()
+        assert app.screen.focused is app.query_one("#log-viewer-level", Select)
+
+        await pilot.press("f1")
+        await settle(pilot)
+        assert app.screen.focused is not app.query_one("#log-viewer-level", Select)
+
+
 # --------------------------------------------------------- handler/logger
 
 

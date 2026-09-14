@@ -353,8 +353,21 @@ class LogViewer(Widget, can_focus=False):
 
     # ---------------------------------------------------------------- drive
 
+    def allow_focus_children(self) -> bool:
+        # Concealed means off-canvas (see the `offset` transition in
+        # DEFAULT_CSS, not `display`, so the slide animation still plays) --
+        # without this override Textual's focus chain doesn't know that and
+        # happily Tabs through the toolbar/log with nothing visible to show
+        # for it.
+        return self.revealed
+
     def watch_revealed(self) -> None:
         self.set_class(self.revealed, "-revealed")
+        if not self.revealed and self.screen.focused in self.query("*"):
+            # Concealing just made the focused widget unreachable by Tab and
+            # invisible -- leaving it focused would strand arrow/type keys on
+            # a widget the user can no longer see.
+            self.screen.set_focus(None)
 
     def reveal(self) -> None:
         self.revealed = True
