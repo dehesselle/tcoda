@@ -31,6 +31,7 @@ from tcw.widgets._header import Header, HeaderArea
 from tcw.widgets._log_viewer import TOGGLE_ACTION, LogViewer
 from tcw.widgets._menubar import OPEN_ACTION, MenuBar
 from tcw.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
+from tcw.widgets._resizable import Resizable
 from tcw.widgets._settings_item import SettingsMenuItem
 
 __all__ = [
@@ -52,6 +53,7 @@ __all__ = [
     "MenuEntry",
     "MenuItem",
     "MenuSeparator",
+    "Resizable",
     "SettingsMenuItem",
     "sort_by_key",
 ]
