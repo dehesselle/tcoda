@@ -19,6 +19,7 @@ other Textual widget's::
 
 from tcw.widgets._about_item import AboutMenuItem
 from tcw.widgets._countdown import Countdown
+from tcw.widgets._datatable import DataTable
 from tcw.widgets._footer import (
     Footer,
     FooterBinding,
@@ -37,6 +38,7 @@ __all__ = [
     "TOGGLE_ACTION",
     "AboutMenuItem",
     "Countdown",
+    "DataTable",
     "Footer",
     "FooterBinding",
     "FooterEntry",

@@ -5,7 +5,7 @@ description = "Textual Common Widgets: a menu bar and a settings system shared a
 readme = "README.md"
 authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
-dependencies = ["platformdirs>=4.11.0", "textual>=8.2.8"]
+dependencies = ["platformdirs>=4.11.0", "textual>=8.2.8,<9"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
