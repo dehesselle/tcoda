@@ -1,0 +1,21 @@
+    __
+   |  |_.----.--.--.--.     Textual Common Widgets
+   |   _|  __|  |  |  |     demo, version $version
+   |____|____|________|
+
+This is an AboutDialog, reading its text from
+src/tcw/demo/about.txt.
+
+The five lines above are a fixed header. The
+rest is the body, which scrolls once it grows
+past ten lines, as this one does.
+
+The version in the header is a $$version
+placeholder, filled in through
+AboutMenuItem(variables=...).
+
+Everything in this demo is ordinary consumer
+code: read src/tcw/demo/ to see how each widget
+and dialog is used.
+
+Press escape to close.

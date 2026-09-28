@@ -13,6 +13,12 @@ dependencies = ["tcw>=0.1"]
 tcw = { path = "../tcw", editable = true }
 ```
 
+## Demo
+
+`python -m tcw` runs a demo app that uses every widget and dialog, the way
+`python -m textual` runs Textual's own. See [docs/demo.md](docs/demo.md) for
+where each component appears in it.
+
 ## Widgets — `tcw.widgets`
 
 | Widget | Description |
@@ -42,6 +48,7 @@ tcw = { path = "../tcw", editable = true }
 | [tcw.chords](docs/chords.md) | VSCode-style multi-key bindings (`ctrl+k ctrl+s`) via an App mixin |
 | [tcw.settings](docs/settings.md) | Self-registering typed settings, persisted only when overridden |
 | [tcw.log_sink](docs/widgets/LogViewer.md#the-sink-tcwlog_sink) | In-memory `logging` handler behind `LogViewer` |
+| [tcw.demo](docs/demo.md) | The demo app behind `python -m tcw` |
 
 The conventions every component follows, and why, are in
 [docs/DESIGN.md](docs/DESIGN.md).
