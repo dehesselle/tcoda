@@ -12,7 +12,7 @@ from tcw.widgets import Resizable
 
 
 class Sidebar(Resizable, Tree):
-    RESIZE_EDGE = "right"      # or "bottom"
+    RESIZE_EDGE = "right"  # or "bottom"
     RESIZE_MIN = 15
     RESIZE_MIN_SIBLING = 20
 ```

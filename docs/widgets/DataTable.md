@@ -14,8 +14,12 @@ class Files(DataTable):
         super().__init__()
         self.entries = entries
         self.add_column("Name", key="name", sortable=True)
-        self.add_column("Size", key="size", sortable=True,
-                        sort_key=lambda key: self.entries[key.value].size)
+        self.add_column(
+            "Size",
+            key="size",
+            sortable=True,
+            sort_key=lambda key: self.entries[key.value].size,
+        )
         self.add_column("Note", key="note")
 
     def get_cell_tooltip(self, row_key, column_key):

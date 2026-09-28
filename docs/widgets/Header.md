@@ -13,8 +13,7 @@ class MainScreen(Screen):
         yield Header(left="MyApp", right="v1.0")
 
     @on(HeaderArea.Clicked, "#header-left")
-    def _left_clicked(self) -> None:
-        ...
+    def _left_clicked(self) -> None: ...
 ```
 
 - **The areas are equal thirds**, not docked to their content, so the middle

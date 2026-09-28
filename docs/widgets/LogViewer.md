@@ -53,7 +53,7 @@ import logging
 
 from tcw.log_sink import InMemoryLogHandler
 
-sink = InMemoryLogHandler()          # capacity=30_000
+sink = InMemoryLogHandler()  # capacity=30_000
 logging.getLogger().addHandler(sink)
 ...
 yield LogViewer(handler=sink)

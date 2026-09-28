@@ -14,7 +14,7 @@ from tcw.log_sink import InMemoryLogHandler, LogEntry
 def _logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     """An unregistered logger, isolated from the global manager and from
     every other test -- no cleanup needed, no risk of cross-test bleed."""
-    logger = logging.Logger(name, level=level)
+    logger = logging.Logger(name, level=level)  # noqa: LOG001
     return logger
 
 

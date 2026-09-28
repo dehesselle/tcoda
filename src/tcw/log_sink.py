@@ -48,7 +48,7 @@ class InMemoryLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             line = self.format(record)
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.handleError(record)
             return
         entry = LogEntry(

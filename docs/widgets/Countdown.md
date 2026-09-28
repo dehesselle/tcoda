@@ -12,9 +12,9 @@ from tcw.widgets import Countdown
 yield Countdown(id="footer-countdown")
 
 ...
-countdown.remaining = 30      # counts down
-countdown.refreshing = True   # spins until cleared
-countdown.display = False     # gone entirely
+countdown.remaining = 30  # counts down
+countdown.refreshing = True  # spins until cleared
+countdown.display = False  # gone entirely
 ```
 
 - **It runs its own spinner: set `refreshing`.** The widget owns its clock, so
