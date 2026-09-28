@@ -1,7 +1,7 @@
 [project]
 name = "tcw"
 dynamic = ["version"]
-description = "Textual Common Widgets: a menu bar and a settings system shared across Textual apps"
+description = "Textual Common Widgets"
 readme = "README.md"
 authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
