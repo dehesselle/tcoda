@@ -22,6 +22,7 @@ tcw = { path = "../tcw", editable = true }
 | [Countdown](docs/widgets/Countdown.md) | Seconds counter with a spinner for work in flight |
 | [MenuBar](docs/widgets/MenuBar.md) | Midnight-Commander style pulldown menu bar, declared inline |
 | [LogViewer](docs/widgets/LogViewer.md) | Slide-down panel showing the app's `logging` output, filterable by level and source |
+| [ChordViewer](docs/widgets/ChordViewer.md) | which-key style panel listing what can follow a pending chord |
 | [DataTable](docs/widgets/DataTable.md) | Textual's `DataTable` plus clickable sorting and per-cell tooltips |
 | [Resizable](docs/widgets/Resizable.md) | Mixin that makes a pane resizable by dragging its border |
 

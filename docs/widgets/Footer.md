@@ -47,7 +47,9 @@ class MainScreen(Screen):
 - **`Binding.Group` is ignored**; grouped bindings render as individual keys.
 - **A pending [chord](../chords.md) shows in the status corner**, beside the
   app's own `status.update(...)` text rather than in place of it, and chord
-  keys display step by step (`^k ^s`). Clicking one runs it.
+  keys display step by step (`^k ^s`). Clicking one runs it. A
+  [`ChordViewer`](ChordViewer.md), once it appears, covers the footer and
+  takes over that hint.
 
 Also exported, for customising rather than everyday use:
 

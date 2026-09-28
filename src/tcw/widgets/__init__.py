@@ -18,6 +18,7 @@ other Textual widget's::
 """
 
 from tcw.widgets._about_item import AboutMenuItem
+from tcw.widgets._chord_viewer import ChordViewer
 from tcw.widgets._countdown import Countdown
 from tcw.widgets._datatable import DataTable
 from tcw.widgets._footer import (
@@ -38,6 +39,7 @@ __all__ = [
     "OPEN_ACTION",
     "TOGGLE_ACTION",
     "AboutMenuItem",
+    "ChordViewer",
     "Countdown",
     "DataTable",
     "Footer",

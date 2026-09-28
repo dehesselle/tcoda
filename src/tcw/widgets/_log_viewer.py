@@ -23,6 +23,7 @@ from textual.widgets import RichLog, Select
 from textual.widgets.selection_list import Selection
 
 from tcw.log_sink import InMemoryLogHandler, LogEntry
+from tcw.widgets._layers import install_layer
 from tcw.widgets._multi_select import MultiSelect
 
 #: The action `LogViewer` installs on its screen -- see `MenuBar.OPEN_ACTION`
@@ -30,10 +31,8 @@ from tcw.widgets._multi_select import MultiSelect
 TOGGLE_ACTION = "toggle_log_viewer"
 
 #: Reserved layer name this widget self-registers onto its host screen so it
-#: reliably paints above ordinary ("default"-layer) content -- mirrors how
-#: Textual's own LoadingIndicator/Toast/Tooltip use `_loading`/`_toastrack`/
-#: `_tooltips`, except those are hardcoded into Screen.layers and this one
-#: can't be, so it installs itself the same way MenuBar installs a binding.
+#: reliably paints above ordinary ("default"-layer) content -- see
+#: `tcw.widgets._layers`.
 _LAYER = "_tcw_log_viewer"
 
 _LEVELS: list[tuple[str, int]] = [
@@ -155,7 +154,7 @@ class LogViewer(Widget, can_focus=False):
     # ------------------------------------------------------------- mounting
 
     def on_mount(self) -> None:
-        self._install_layer()
+        install_layer(self.screen, _LAYER)
         if self._key is not None:
             self._install_binding()
         self._attach_handler()
@@ -178,18 +177,6 @@ class LogViewer(Widget, can_focus=False):
         self._handler.unsubscribe(self._on_sink_entry)
         if self._owns_handler:
             self._logger.removeHandler(self._handler)
-
-    def _install_layer(self) -> None:
-        # `screen.styles.layers` (the raw CSS rule) is empty until something
-        # sets it -- it does not include "default", the name ordinary
-        # content resolves to. Omitting that would put both this panel and
-        # ordinary content at the same paint-order index, defeating the
-        # overlay -- so an unset rule is treated as `("default",)`, not `()`.
-        existing = self.screen.styles.layers
-        if _LAYER in existing:
-            return
-        base = existing if existing else ("default",)
-        self.screen.styles.layers = (*base, _LAYER)
 
     def _install_binding(self) -> None:
         # A key binding cannot live on this widget: Textual only consults

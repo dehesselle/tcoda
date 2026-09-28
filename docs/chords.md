@@ -40,3 +40,44 @@ class MyApp(ChordMixin, App[None]):
   of it, and displays chord keys step by step (`^k ^s`). Clicking one runs it.
   The steps typed so far are also available as the app's `pending_chord`
   reactive.
+- **A [`ChordViewer`](widgets/ChordViewer.md) lists what can come next**, in
+  the style of which-key.nvim, if the user hesitates partway through a chord.
+
+## Naming groups
+
+A prefix that leads to further chords can be given a name for the
+[`ChordViewer`](widgets/ChordViewer.md) to show, in a class variable next to
+`BINDINGS`:
+
+```python
+class MyApp(ChordMixin, App[None]):
+    BINDINGS = [
+        Binding("ctrl+k g a", "stage", "Stage"),
+        Binding("ctrl+k g c", "commit", "Commit"),
+    ]
+    CHORD_GROUPS = {"ctrl+k": "Keyboard", "ctrl+k g": "Git"}
+```
+
+- **Only the names live there; the chords stay in `BINDINGS`.** That is what
+  keeps `check_action`, keymaps, the footer and focus-chain scoping working,
+  so the variable is deliberately `CHORD_GROUPS` and not `CHORDS`. A group is
+  also not a fake binding: it has no action to run and nothing to match, so
+  the mixin's matching does not change.
+- **Any node with bindings may declare one**, app, screen or widget, and its
+  names apply on the same terms as its bindings: while it is in the focus
+  chain, with a node nearer the focus winning. A subclass adds to its
+  parents' names rather than replacing them all, as `BINDINGS` does.
+- **A group has no condition of its own.** It is shown only while some chord
+  under it is, so it comes and goes with its chords.
+- **A keymap that moves a chord's prefix does not move its group's name.**
+  `set_keymap` only knows about bindings.
+- `chord_groups(screen)` returns the names in force, keyed by steps.
+
+## Holding a chord
+
+`hold_chord()` is for whatever has just shown the user what can come next
+(the `ChordViewer` calls it when it appears). The pending chord then waits
+until it completes or is abandoned, whatever `CHORD_TIMEOUT` says, and
+`CHORD_BACK_KEY` (`"backspace"`, or None for no back key) drops the last step
+instead of abandoning the chord. Stepping back from the first step abandons
+it. A chord that actually continues with that key still wins.

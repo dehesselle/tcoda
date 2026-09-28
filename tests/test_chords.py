@@ -9,7 +9,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Input, Static
 
-from tcw.chords import ChordMixin
+from tcw.chords import ChordMixin, chord_groups
 from tcw.widgets import Footer, FooterBinding
 
 
@@ -199,3 +199,112 @@ async def test_the_footer_shows_a_pending_chord() -> None:
         # The app's own status text was never touched.
         text = footer.status.query_one("#footer-status-text", Static)
         assert str(text.content) == "Online"
+
+
+class Grouped(Harness):
+    CHORD_GROUPS: ClassVar[dict[str, str]] = {
+        "ctrl+k": "Keyboard",
+        "ctrl+k x": "Extras",
+        "ctrl+k ?": "Help",
+    }
+
+
+class Regrouped(Grouped):
+    CHORD_GROUPS: ClassVar[dict[str, str]] = {"ctrl+k x": "More"}
+
+
+class NamedInput(Input):
+    CHORD_GROUPS: ClassVar[dict[str, str]] = {"ctrl+k": "Field"}
+
+
+class FocusGrouped(Grouped):
+    def compose(self) -> ComposeResult:
+        yield NamedInput(id="input")
+
+
+async def test_chord_groups_merge_along_the_class_hierarchy() -> None:
+    app = Regrouped()
+    async with app.run_test():
+        groups = chord_groups(app.screen)
+        assert groups[("ctrl+k",)] == "Keyboard"
+        # A subclass overrides one name without dropping its parent's others.
+        assert groups[("ctrl+k", "x")] == "More"
+        # Keys are normalised the way the key press will say them.
+        assert groups[("ctrl+k", "question_mark")] == "Help"
+
+
+async def test_chord_groups_follow_the_focus_chain() -> None:
+    app = FocusGrouped()
+    async with app.run_test() as pilot:
+        assert chord_groups(app.screen)[("ctrl+k",)] == "Keyboard"
+        app.query_one(NamedInput).focus()
+        await pilot.pause()
+        # Nearer the focus wins, but only while it is in the chain.
+        assert chord_groups(app.screen)[("ctrl+k",)] == "Field"
+
+
+async def test_a_held_chord_does_not_time_out() -> None:
+    app = Harness()
+    app.CHORD_TIMEOUT = 0.1
+    async with app.run_test() as pilot:
+        await pilot.press("ctrl+k")
+        app.hold_chord()
+        await pilot.pause(0.3)
+        assert app.pending_chord == ("ctrl+k",)
+        # Nor does a further step re-arm the timeout.
+        await pilot.press("x")
+        await pilot.pause(0.3)
+        assert app.pending_chord == ("ctrl+k", "x")
+        await pilot.press("y")
+        assert app.fired == ["xy"]
+        # Holding ends with the chord: the next one times out again.
+        await pilot.press("ctrl+k")
+        await pilot.pause(0.3)
+        assert app.pending_chord == ()
+
+
+async def test_holding_nothing_does_nothing() -> None:
+    app = Harness()
+    app.CHORD_TIMEOUT = 0.1
+    async with app.run_test() as pilot:
+        app.hold_chord()
+        await pilot.press("ctrl+k")
+        await pilot.pause(0.3)
+        assert app.pending_chord == ()
+
+
+async def test_backspace_steps_back_only_while_held() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        # Not held: backspace is just another key that continues nothing.
+        await pilot.press("ctrl+k", "x", "backspace")
+        assert app.pending_chord == ()
+
+        await pilot.press("ctrl+k", "x")
+        app.hold_chord()
+        await pilot.press("backspace")
+        assert app.pending_chord == ("ctrl+k",)
+        await pilot.press("ctrl+s")
+        assert app.fired == ["save"]
+
+        # Stepping back from the first step abandons the chord.
+        await pilot.press("ctrl+k")
+        app.hold_chord()
+        await pilot.press("backspace")
+        assert app.pending_chord == ()
+
+
+class Erasing(Harness):
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("ctrl+b backspace", "record('erase')", "Erase"),
+    ]
+
+
+async def test_a_chord_continuing_with_backspace_beats_stepping_back() -> None:
+    app = Erasing()
+    async with app.run_test() as pilot:
+        await pilot.press("ctrl+b")
+        app.hold_chord()
+        await pilot.press("backspace")
+        assert app.fired == ["erase"]
+        assert app.pending_chord == ()

@@ -73,17 +73,22 @@ type SortKey = Callable[[FooterEntry], object]
 _DIGITS = re.compile(r"(\d+)")
 
 
-def sort_by_key(entry: FooterEntry) -> object:
-    """Natural order on the displayed key, so `f2` sorts before `f10`.
+def natural_key(text: str) -> object:
+    """Natural order on text, so `f2` sorts before `f10`.
 
     Plain string order would not: it compares "10" against "2" a character at
     a time. Digit runs are compared as numbers here, everything else as text.
     """
     return tuple(
         (1, int(part), "") if part.isdigit() else (0, 0, part)
-        for part in _DIGITS.split(entry.key_display.lower())
+        for part in _DIGITS.split(text.lower())
         if part
     )
+
+
+def sort_by_key(entry: FooterEntry) -> object:
+    """Natural order on the displayed key -- see `natural_key`."""
+    return natural_key(entry.key_display)
 
 
 def _occupied(area: Widget) -> bool:
