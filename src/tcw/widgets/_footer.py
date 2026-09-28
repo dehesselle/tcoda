@@ -12,7 +12,8 @@ that is not a key. This one splits the row into three areas::
 * the rest -- every other active binding, in Textual's own order unless
   `sort=` says otherwise.
 * **status** -- whatever was yielded into the footer, plus a text label
-  reached as `footer.status.update("Online")`.
+  reached as `footer.status.update("Online")`. In a `ChordMixin` app it also
+  shows a chord that is waiting for its next step.
 
 A pinned binding renders even when it was declared `show=False`: naming a key
 in `pinned=` is an explicit request to show it, which outranks a default its
@@ -41,6 +42,8 @@ from textual.dom import DOMNode, NoScreen
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
+
+from tcw.chords import ChordMixin, Steps
 
 if TYPE_CHECKING:
     from textual.screen import Screen
@@ -205,11 +208,12 @@ class FooterStatus(HorizontalGroup):
     def compose(self) -> ComposeResult:
         # Pending children -- whatever the app yielded into the Footer -- are
         # mounted before anything compose() yields, so this label always lands
-        # rightmost. It starts hidden, so an unused status area takes up no
-        # width and earns no divider.
-        label = Static(id="footer-status-text")
-        label.display = False
-        yield label
+        # rightmost. They start hidden, so an unused status area takes up no
+        # width and earns no divider. The chord hint has a label of its own so
+        # that it never clobbers -- or is clobbered by -- the app's text.
+        for label in (Static(id="footer-chord"), Static(id="footer-status-text")):
+            label.display = False
+            yield label
 
     def update(self, renderable: VisualType = "") -> None:
         """Set the status text, mirroring `header.right.update(...)`.
@@ -221,6 +225,11 @@ class FooterStatus(HorizontalGroup):
         # An empty label still occupies its padding, which would leave a gap --
         # and a divider -- with nothing in it.
         label.display = bool(renderable)
+
+    def _show_chord(self, text: str) -> None:
+        label = self.query_one("#footer-chord", Static)
+        label.update(text)
+        label.display = bool(text)
 
     def on_resize(self) -> None:
         # An app hiding its own status widget (`countdown.display = False`) is
@@ -402,6 +411,8 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
         # happens here, with no "bindings ready" reactive of the kind the stock
         # footer needs.
         self.screen.bindings_updated_signal.subscribe(self, self._bindings_changed)
+        if isinstance(self.app, ChordMixin):
+            self.watch(self.app, "pending_chord", self._chord_changed)
         await self._rebuild()
 
     def on_unmount(self) -> None:
@@ -419,6 +430,14 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
         # footer stale long after the bindings themselves changed.
         if self.is_attached and screen is self.screen:
             await self._rebuild()
+
+    def _chord_changed(self, steps: Steps) -> None:
+        app = self.app
+        assert isinstance(app, ChordMixin)
+        text = (
+            f"({app.get_chord_display(steps)}) waiting for next key…" if steps else ""
+        )
+        self.status._show_chord(text)
 
     def validate_pinned(self, pinned: str | Sequence[str]) -> tuple[str, ...]:
         return _tokens(pinned)
