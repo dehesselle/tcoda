@@ -1,0 +1,56 @@
+# Menu bar
+
+A Midnight-Commander style pulldown bar: hidden until used, opened with F9 or
+by clicking a title, with a bar-only stage before any dropdown so a mnemonic
+letter is never ambiguous between "pick a menu" and "pick an item".
+
+Declared inline, like any other part of a Textual UI:
+
+```python
+from tcw.widgets import Menu, MenuBar, MenuItem, MenuSeparator, SettingsMenuItem
+
+
+class MainScreen(Screen):
+    def compose(self) -> ComposeResult:
+        with MenuBar(trailing=f"myapp {VERSION}"):
+            with Menu("File", id="file"):
+                yield MenuItem("Open...", id="open", mnemonic="o")
+                yield MenuSeparator()
+                yield MenuItem("Save", id="save", mnemonic="s", shortcut="Ctrl+S")
+                yield SettingsMenuItem()
+                yield MenuItem("Quit", id="quit", mnemonic="q", action="app.quit")
+
+    @on(MenuItem.Pressed, "#open")
+    @work
+    async def _open(self) -> None:
+        await self.app.push_screen_wait(OpenDialog())
+```
+
+- **Choosing an item posts `MenuItem.Pressed`**, which bubbles item → `Menu` →
+  `MenuBar` → screen, so it is handled exactly like `Button.Pressed`. The
+  message also carries the `Menu`, matchable as
+  `@on(MenuItem.Pressed, "#filter", menu="#right")` — which is how one item id
+  can appear in two menus and still act on the right thing.
+- **A handler that pushes a screen and waits needs `@work`.** Nothing in a
+  plain message handler provides the worker context `push_screen_wait`
+  requires. The `action=` argument is the exception: `MenuBar` runs it from
+  inside its own worker, so a Textual action string or an async callable works
+  there without one.
+- **`MenuBar` installs its own key binding** on whichever screen it is mounted
+  on — see [DESIGN.md](../DESIGN.md#widgets-that-own-a-key-bind-it-on-their-screen).
+  The action is called `open_menubar` (exported as `OPEN_ACTION`), so
+  something other than the key (a clickable key bar, say) reaches it with
+  `run_action("screen.open_menubar")`. Pass `key=None` to bind it yourself.
+  Where the key *appears* is not the bar's business: pin it with
+  [`Footer(pinned=(OPEN_ACTION,))`](Footer.md). Under a stock `Footer` it lands
+  in focus-chain order like anything else.
+- **Ids are CSS ids.** Textual only needs a `MenuItem` id to be unique among
+  one menu's children, but an app stylesheet rule of the same name will style
+  it — which, for a widget inside a one-row bar, shows up as a garbled bar
+  rather than as a colour. Prefer a name the app does not already use.
+- **Ready-made items**: [`SettingsMenuItem`](../dialogs/SettingsDialog.md) and
+  [`AboutMenuItem`](../dialogs/AboutDialog.md) each open their dialog with no
+  handler on the app's side.
+- **Type aliases for annotations**: `MenuAction` is what `action=` accepts (an
+  action string or a callable, sync or async); `MenuEntry` is anything that can
+  sit in a `Menu` (`MenuItem | MenuSeparator`).
