@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from textual import events
 from textual.app import ComposeResult
+from textual.await_complete import AwaitComplete
 from textual.binding import Binding, BindingType
 from textual.geometry import Offset
 from textual.screen import ModalScreen
@@ -58,7 +59,22 @@ def _menu_at(menus: list[Menu], offset: Offset) -> Menu | None:
     return None
 
 
-class MenuBarOverlay(ModalScreen[Menu | None]):
+class _MenuStage[ResultT](ModalScreen[ResultT]):
+    """What both stages share: a dismiss that only ever pops itself."""
+
+    def dismiss(self, result: ResultT | None = None) -> AwaitComplete:
+        # Events already queued on this screen keep arriving after the first
+        # dismiss has popped it -- a fast mouse sweep queues several moves --
+        # and Textual's dismiss pops whatever is on top: the base screen
+        # (ScreenStackError) or the next stage (orphaning the MenuBar worker's
+        # future, so the bar hangs). Guarding here rather than at each call
+        # site is what keeps the next handler that dismisses covered too.
+        if not self.is_active:
+            return AwaitComplete.nothing()
+        return super().dismiss(result)
+
+
+class MenuBarOverlay(_MenuStage[Menu | None]):
     """The bar-only stage: arrow or type a letter to pick a title."""
 
     DEFAULT_CSS = """
@@ -122,7 +138,7 @@ class MenuBarOverlay(ModalScreen[Menu | None]):
         self.dismiss(menu)
 
 
-class MenuDropdown(ModalScreen[MenuDropdownResult]):
+class MenuDropdown(_MenuStage[MenuDropdownResult]):
     """A single pulldown menu's contents, positioned under its title."""
 
     DEFAULT_CSS = """

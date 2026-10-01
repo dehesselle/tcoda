@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 from typing import ClassVar
 
-from textual import on
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.pilot import Pilot
@@ -306,6 +306,59 @@ async def test_hovering_another_title_while_a_dropdown_is_open_switches_menus() 
         await pilot.hover(offset=(help_region.x, help_region.y))
         await settle(pilot)
         assert isinstance(app.screen, MenuDropdown)
+        assert app.query_one("#help", Menu).armed is True
+
+
+def _burst[EventT: events.MouseEvent](
+    screen: Screen, event_type: type[EventT], x: int, y: int
+) -> None:
+    """Queue two `event_type` events at screen position (x, y) on `screen`
+    before it gets to handle either.
+
+    `pilot.hover`/`click` let each event be handled before sending the next,
+    which can never reproduce a burst. Each is marked forwarded, as Textual's
+    own delivery does: otherwise it bubbles back up to the App, which forwards
+    it again to whatever screen is on top by then.
+    """
+    for _ in range(2):
+        event = event_type(None, x, y, 0, 0, 0, False, False, False, x, y)
+        event._set_forwarded()
+        screen.post_message(event)
+
+
+async def test_a_burst_of_moves_over_another_title_switches_menus_only_once() -> None:
+    """A fast sweep can queue several moves on the dropdown before it handles
+    the first; the ones still queued after it dismissed must not pop again."""
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("enter")
+        await settle(pilot)
+        dropdown = app.screen
+        help_region = app.query_one("#help", Menu).region
+        _burst(dropdown, events.MouseMove, help_region.x, help_region.y)
+        await settle(pilot)
+        assert isinstance(app.screen, MenuDropdown)
+        assert app.screen is not dropdown
+        assert len(app.screen_stack) == 2
+        assert app.query_one("#help", Menu).armed is True
+
+
+async def test_a_burst_of_clicks_in_the_bar_only_stage_opens_the_menu_only_once() -> (
+    None
+):
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        overlay = app.screen
+        assert isinstance(overlay, MenuBarOverlay)
+        help_region = app.query_one("#help", Menu).region
+        _burst(overlay, events.Click, help_region.x, help_region.y)
+        await settle(pilot)
+        assert isinstance(app.screen, MenuDropdown)
+        assert len(app.screen_stack) == 2
         assert app.query_one("#help", Menu).armed is True
 
 
