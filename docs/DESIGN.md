@@ -1,15 +1,18 @@
-# tcw — design
+# tcoda — design
 
 This document holds the decisions that span more than one widget, dialog or
 module. Reasoning specific to one component lives in that component's own doc,
 next to what it explains — see the tables in the [README](../README.md).
 
-## Why tcw exists
+## Why tcoda exists
 
 The widgets here are shared between several Textual apps (`snowcone`,
 `snakecam`, `vc`), extracted so a fix is made once rather than three times.
 Most of what is here was grown independently in more than one app first,
 which is why several docs open by naming the workarounds the widget replaced.
+
+The name is short for "Textual coda": what comes after the widgets Textual
+itself provides.
 
 ## Styling is inline `DEFAULT_CSS`
 
@@ -77,20 +80,20 @@ A mixin defines no `__init__`: one would have to cooperate with the signature
 of every class it is mixed into. State it needs starts life as a class-level
 default instead.
 
-## `import tcw` imports nothing
+## `import tcoda` imports nothing
 
-`tcw/__init__.py` is deliberately empty of imports: pulling in `tcw` must not
+`tcoda/__init__.py` is deliberately empty of imports: pulling in `tcoda` must not
 drag Textual (or a config file read) into a module that only wanted the
-version. Consumers import from `tcw.widgets`, `tcw.dialogs`, `tcw.settings`,
-`tcw.chords` or `tcw.log_sink`.
+version. Consumers import from `tcoda.widgets`, `tcoda.dialogs`, `tcoda.settings`,
+`tcoda.chords` or `tcoda.log_sink`.
 
-The same rule applies between subpackages: `tcw.widgets` stays importable
+The same rule applies between subpackages: `tcoda.widgets` stays importable
 without the settings machinery, so `SettingsMenuItem` imports
 `SettingsDialog` lazily, when it is chosen.
 
 ## Persisted state is an optimisation, never a dependency
 
-Every store built on `tcw.paths` (the settings file, and anything an app keeps
+Every store built on `tcoda.paths` (the settings file, and anything an app keeps
 in its per-user config/cache/data directories) is an optimisation: an absent,
 unreadable or corrupt file means "no data", not a crash on startup. That is
 why `read_json` degrades to a default instead of raising, and why writes go

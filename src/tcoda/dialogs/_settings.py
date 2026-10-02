@@ -1,7 +1,7 @@
 """The settings dialog: a tree of groups on the left, the selected group's
 editable entries on the right.
 
-Enumerates whatever has been declared -- see `tcw.settings` -- so adding a
+Enumerates whatever has been declared -- see `tcoda.settings` -- so adding a
 setting needs no wiring here at all.
 """
 
@@ -18,10 +18,10 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Label, Rule, Select, Switch, Tree
 from textual.widgets.tree import TreeNode
 
-from tcw._text import marker_text
-from tcw.dialogs._confirm import ConfirmDialog
-from tcw.dialogs._dialog import Dialog
-from tcw.settings import Setting, SettingAction, SettingsEntry, all_settings, config
+from tcoda._text import marker_text
+from tcoda.dialogs._confirm import ConfirmDialog
+from tcoda.dialogs._dialog import Dialog
+from tcoda.settings import Setting, SettingAction, SettingsEntry, all_settings, config
 
 ValueWidget = Input | Switch | Select | Button
 

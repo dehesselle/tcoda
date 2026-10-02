@@ -1,4 +1,4 @@
-# tcw
+# tcoda
 
 **Read `docs/DESIGN.md` first.** It carries the conventions shared across every
 widget and dialog, and the reasoning behind them.

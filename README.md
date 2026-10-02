@@ -1,4 +1,4 @@
-# tcw — Textual Common Widgets
+# tcoda — Textual coda
 
 Widgets shared between several Textual apps (`snowcone`, `snakecam`, `vc`),
 extracted so a fix is made once rather than three times.
@@ -7,19 +7,19 @@ Consumed as an editable path dependency while it is still being tracked from
 source:
 
 ```toml
-dependencies = ["tcw>=0.1"]
+dependencies = ["tcoda>=0.1"]
 
 [tool.uv.sources]
-tcw = { path = "../tcw", editable = true }
+tcoda = { path = "../tcoda", editable = true }
 ```
 
 ## Demo
 
-`python -m tcw` runs a demo app that uses every widget and dialog, the way
+`python -m tcoda` runs a demo app that uses every widget and dialog, the way
 `python -m textual` runs Textual's own. See [docs/demo.md](docs/demo.md) for
 where each component appears in it.
 
-## Widgets — `tcw.widgets`
+## Widgets — `tcoda.widgets`
 
 | Widget | Description |
 | --- | --- |
@@ -32,7 +32,7 @@ where each component appears in it.
 | [DataTable](docs/widgets/DataTable.md) | Textual's `DataTable` plus clickable sorting and per-cell tooltips |
 | [Resizable](docs/widgets/Resizable.md) | Mixin that makes a pane resizable by dragging its border |
 
-## Dialogs — `tcw.dialogs`
+## Dialogs — `tcoda.dialogs`
 
 | Dialog | Description |
 | --- | --- |
@@ -45,10 +45,10 @@ where each component appears in it.
 
 | Module | Description |
 | --- | --- |
-| [tcw.chords](docs/chords.md) | VSCode-style multi-key bindings (`ctrl+k ctrl+s`) via an App mixin |
-| [tcw.settings](docs/settings.md) | Self-registering typed settings, persisted only when overridden |
-| [tcw.log_sink](docs/widgets/LogViewer.md#the-sink-tcwlog_sink) | In-memory `logging` handler behind `LogViewer` |
-| [tcw.demo](docs/demo.md) | The demo app behind `python -m tcw` |
+| [tcoda.chords](docs/chords.md) | VSCode-style multi-key bindings (`ctrl+k ctrl+s`) via an App mixin |
+| [tcoda.settings](docs/settings.md) | Self-registering typed settings, persisted only when overridden |
+| [tcoda.log_sink](docs/widgets/LogViewer.md#the-sink-tcodalog_sink) | In-memory `logging` handler behind `LogViewer` |
+| [tcoda.demo](docs/demo.md) | The demo app behind `python -m tcoda` |
 
 The conventions every component follows, and why, are in
 [docs/DESIGN.md](docs/DESIGN.md).

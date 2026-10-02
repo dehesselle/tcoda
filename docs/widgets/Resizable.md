@@ -8,7 +8,7 @@ widget already draws *is* the grab area.
 ```python
 from textual.widgets import Tree
 
-from tcw.widgets import Resizable
+from tcoda.widgets import Resizable
 
 
 class Sidebar(Resizable, Tree):

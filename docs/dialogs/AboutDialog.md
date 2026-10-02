@@ -6,7 +6,7 @@ a scrollable body capped at ten lines, so the dialog never grows past
 fifteen lines or 57 columns wide.
 
 ```python
-from tcw.widgets import AboutMenuItem
+from tcoda.widgets import AboutMenuItem
 
 from myapp import __version__
 

@@ -149,7 +149,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tcw"
+name = "tcoda"
 source = { editable = "." }
 dependencies = [
     { name = "platformdirs" },

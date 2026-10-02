@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tcw import settings as settings_module
+from tcoda import settings as settings_module
 
 
 @pytest.fixture(autouse=True)

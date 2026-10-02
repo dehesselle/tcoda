@@ -10,7 +10,7 @@ import asyncio
 
 from textual.app import App, ComposeResult
 
-from tcw.widgets import Countdown
+from tcoda.widgets import Countdown
 
 
 class Harness(App[None]):

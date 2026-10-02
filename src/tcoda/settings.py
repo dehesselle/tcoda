@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tcw.paths import read_json, settings_file, write_json_atomic
+from tcoda.paths import read_json, settings_file, write_json_atomic
 
 _registry: dict[str, SettingsEntry] = {}
 
@@ -161,8 +161,8 @@ class ConfigStore:
         if self._path is None:
             if self._app_name is None:
                 raise RuntimeError(
-                    "tcw settings are not configured; call "
-                    "tcw.settings.configure(<app name>) before using `config`"
+                    "tcoda settings are not configured; call "
+                    "tcoda.settings.configure(<app name>) before using `config`"
                 )
             self._path = settings_file(self._app_name)
         return self._path

@@ -1,7 +1,7 @@
 # Dialog
 
 The shared chrome for centered modal dialogs, and the base class of every
-dialog in tcw. It hoists only what every dialog shares: a bordered box, a bold
+dialog in tcoda. It hoists only what every dialog shares: a bordered box, a bold
 centered title, a right-aligned button row, and escape-to-cancel. What a
 "dialog" is, as opposed to a screen or an overlay, is set out in
 [DESIGN.md](../DESIGN.md#naming-dialog-screen-and-overlays).
@@ -10,7 +10,7 @@ centered title, a right-aligned button row, and escape-to-cancel. What a
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Label
 
-from tcw.dialogs import Dialog
+from tcoda.dialogs import Dialog
 
 
 class RenameDialog(Dialog[str | None]):

@@ -15,10 +15,10 @@ from textual.app import App, ComposeResult
 from textual.pilot import Pilot
 from textual.widgets import RichLog, Select, Static
 
-from tcw.log_sink import InMemoryLogHandler
-from tcw.widgets import LogViewer
-from tcw.widgets._log_viewer import _LAYER
-from tcw.widgets._multi_select import MultiSelect, MultiSelectOverlay
+from tcoda.log_sink import InMemoryLogHandler
+from tcoda.widgets import LogViewer
+from tcoda.widgets._log_viewer import _LAYER
+from tcoda.widgets._multi_select import MultiSelect, MultiSelectOverlay
 
 
 class Harness(App[None]):
@@ -51,8 +51,9 @@ def _log_text(app: App[None]) -> str:
     across several physical `Strip`s -- a long `logger_name` fixture plus
     the timestamp/level prefix routinely pushes a message past the test
     viewport's width. Joining with spaces keeps a wrapped message's
-    substring checks meaningful without caring where the wrap landed."""
-    return " ".join(_log_lines(app))
+    substring checks meaningful without caring where the wrap landed; runs of
+    whitespace collapse to one, since a wrap at a space keeps that space."""
+    return " ".join(" ".join(_log_lines(app)).split())
 
 
 def _sources_label(app: App[None]) -> str:
@@ -79,7 +80,7 @@ async def reveal(pilot: Pilot[None]) -> None:
 def logger_name() -> str:
     """A fresh, never-reused logger name per test -- isolated from every
     other test and from the real root logger, with no cleanup required."""
-    return f"tcw-test-{uuid.uuid4().hex}"
+    return f"tcoda-test-{uuid.uuid4().hex}"
 
 
 def _source(namespace: str, name: str) -> logging.Logger:

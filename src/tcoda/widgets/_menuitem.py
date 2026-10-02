@@ -32,7 +32,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcw._text import mnemonic_text
+from tcoda._text import mnemonic_text
 
 #: What a `MenuItem`'s `action` may be: a Textual action string run against
 #: the screen ("app.quit", "pick_database"), or a zero-argument callable,

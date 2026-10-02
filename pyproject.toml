@@ -1,7 +1,7 @@
 [project]
-name = "tcw"
+name = "tcoda"
 dynamic = ["version"]
-description = "Textual Common Widgets"
+description = "Textual coda: widgets, dialogs and helpers"
 readme = "README.md"
 authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
@@ -15,7 +15,7 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/tcw/version.py"
+version-file = "src/tcoda/version.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

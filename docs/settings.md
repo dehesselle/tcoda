@@ -7,7 +7,7 @@ overrode.
 
 ```python
 # myapp/settings.py
-from tcw.settings import Setting, config, configure
+from tcoda.settings import Setting, config, configure
 
 configure("myapp")  # resolved lazily, on first read -- no import-time I/O
 
@@ -45,5 +45,5 @@ the dialog takes effect without a restart.
   a module behind an optional extra hides it from the dialog while its stored
   value lingers. Declare them somewhere always imported.
 - The settings file lives in the platform's per-user config directory
-  (`tcw.paths`). A missing or corrupt file reads as "no overrides" — see
+  (`tcoda.paths`). A missing or corrupt file reads as "no overrides" — see
   [DESIGN.md](DESIGN.md#persisted-state-is-an-optimisation-never-a-dependency).

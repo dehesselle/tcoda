@@ -17,23 +17,23 @@ other Textual widget's::
         ...
 """
 
-from tcw.widgets._about_item import AboutMenuItem
-from tcw.widgets._chord_viewer import ChordViewer
-from tcw.widgets._countdown import Countdown
-from tcw.widgets._datatable import DataTable
-from tcw.widgets._footer import (
+from tcoda.widgets._about_item import AboutMenuItem
+from tcoda.widgets._chord_viewer import ChordViewer
+from tcoda.widgets._countdown import Countdown
+from tcoda.widgets._datatable import DataTable
+from tcoda.widgets._footer import (
     Footer,
     FooterBinding,
     FooterEntry,
     FooterStatus,
     sort_by_key,
 )
-from tcw.widgets._header import Header, HeaderArea
-from tcw.widgets._log_viewer import TOGGLE_ACTION, LogViewer
-from tcw.widgets._menubar import OPEN_ACTION, MenuBar
-from tcw.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
-from tcw.widgets._resizable import Resizable
-from tcw.widgets._settings_item import SettingsMenuItem
+from tcoda.widgets._header import Header, HeaderArea
+from tcoda.widgets._log_viewer import TOGGLE_ACTION, LogViewer
+from tcoda.widgets._menubar import OPEN_ACTION, MenuBar
+from tcoda.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
+from tcoda.widgets._resizable import Resizable
+from tcoda.widgets._settings_item import SettingsMenuItem
 
 __all__ = [
     "OPEN_ACTION",

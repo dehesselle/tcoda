@@ -9,8 +9,8 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Input, Static
 
-from tcw.chords import ChordMixin, chord_groups
-from tcw.widgets import Footer, FooterBinding
+from tcoda.chords import ChordMixin, chord_groups
+from tcoda.widgets import Footer, FooterBinding
 
 
 class Harness(ChordMixin, App[None]):

@@ -6,7 +6,7 @@ from __future__ import annotations
 from textual import on
 from textual.app import App, ComposeResult
 
-from tcw.widgets import Header, HeaderArea
+from tcoda.widgets import Header, HeaderArea
 
 
 class Harness(App[None]):

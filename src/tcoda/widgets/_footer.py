@@ -43,7 +43,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcw.chords import ChordMixin, Steps
+from tcoda.chords import ChordMixin, Steps
 
 if TYPE_CHECKING:
     from textual.screen import Screen

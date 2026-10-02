@@ -12,7 +12,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Label, Static
 
-from tcw.dialogs._dialog import Dialog
+from tcoda.dialogs._dialog import Dialog
 
 
 class ConfirmDialog(Dialog[bool]):

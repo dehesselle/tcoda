@@ -1,6 +1,6 @@
 """The menu bar: a row of pulldown menu titles plus an optional trailing label.
 
-Composed declaratively -- see `tcw.widgets._menuitem` -- and self-driving:
+Composed declaratively -- see `tcoda.widgets._menuitem` -- and self-driving:
 yield one, and its key (F9 by default) opens it. All the staging lives here
 rather than on the host screen, so adopting the bar is one `yield` and a
 handful of `@on(MenuItem.Pressed, ...)` handlers.
@@ -16,8 +16,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcw.widgets._dropdown import MenuBarOverlay, MenuDropdown, OpenNeighbor
-from tcw.widgets._menuitem import Menu, MenuItem
+from tcoda.widgets._dropdown import MenuBarOverlay, MenuDropdown, OpenNeighbor
+from tcoda.widgets._menuitem import Menu, MenuItem
 
 #: The action `MenuBar` installs on its screen, and therefore the name to use
 #: when something other than the key binding wants to open the bar --
@@ -128,7 +128,7 @@ class MenuBar(Widget, can_focus=False):
             self._key_description,
             show=self._show_key,
         )
-        # Where the key *appears* is not this widget's business: `tcw.widgets.
+        # Where the key *appears* is not this widget's business: `tcoda.widgets.
         # Footer(pinned=(OPEN_ACTION,))` puts it wherever the app wants it, and
         # does it properly -- reordering the screen's own map, as this used to,
         # still left any binding on the focused widget sorting ahead of it.

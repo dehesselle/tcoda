@@ -1,14 +1,14 @@
 # Demo
 
 ```sh
-python -m tcw          # wherever tcw is installed
-uv run python -m tcw   # from this repository
+python -m tcoda          # wherever tcoda is installed
+uv run python -m tcoda   # from this repository
 ```
 
 This is the same idea as `python -m textual`. The demo is a small browser
-over tcw's own installed source files, with every widget and dialog in its
+over tcoda's own installed source files, with every widget and dialog in its
 natural place. All of it is ordinary consumer code, so
-[`src/tcw/demo/`](../src/tcw/demo/) doubles as a worked example.
+[`src/tcoda/demo/`](../src/tcoda/demo/) doubles as a worked example.
 
 | Component | Where to find it |
 | --- | --- |
@@ -18,7 +18,7 @@ natural place. All of it is ordinary consumer code, so
 | [DataTable](widgets/DataTable.md) | The file list. Click a header to sort. Size and Modified show rounded values but rank by the exact bytes and mtime. Hover a cell for its tooltip. |
 | [Footer](widgets/Footer.md) | Bottom row: `F9`, `F1` and `^q` pinned, the other keys sorted, and a countdown plus a file count in the status corner. |
 | [Countdown](widgets/Countdown.md) | Footer status corner. It spins during an auto-refresh. Turning auto-refresh off in the settings hides it. |
-| [LogViewer](widgets/LogViewer.md) | F1. Four `tcw.demo.*` loggers write to it, so the source filter has something to filter. |
+| [LogViewer](widgets/LogViewer.md) | F1. Four `tcoda.demo.*` loggers write to it, so the source filter has something to filter. |
 | [Chords](chords.md) and [ChordViewer](widgets/ChordViewer.md) | `ctrl+k` then a pause lists every chord: `s …` sorts, `d …` opens each dialog, `r` refreshes, `t` changes theme. |
 | [ConfirmDialog](dialogs/ConfirmDialog.md) | Dialogs → Confirm, and Delete files (the `danger=True, focus_cancel=True` variant, which deletes nothing). |
 | [Dialog](dialogs/Dialog.md) | Dialogs → Filter (F2): `FilterDialog`, the demo's own dialog on the shared chrome. |
@@ -26,7 +26,7 @@ natural place. All of it is ordinary consumer code, so
 | [SettingsDialog](dialogs/SettingsDialog.md) and [settings](settings.md) | File → Settings. The dotted `Demo.Refresh` and `Demo.Table` groups include a `choices=` setting and a `SettingAction`. Changes apply when the dialog closes. |
 
 - **Settings persist.** They go to the per-user settings file of an app named
-  `tcw-demo`, and only overridden values are written.
-- **`tcw.demo` is an app, not a library module.** Importing it declares the
-  demo's settings and points `tcw.settings.config` at that file, so nothing
+  `tcoda-demo`, and only overridden values are written.
+- **`tcoda.demo` is an app, not a library module.** Importing it declares the
+  demo's settings and points `tcoda.settings.config` at that file, so nothing
   else should import it.

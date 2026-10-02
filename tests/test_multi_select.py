@@ -12,7 +12,7 @@ from textual.pilot import Pilot
 from textual.widgets import Button
 from textual.widgets.selection_list import Selection
 
-from tcw.widgets._multi_select import (
+from tcoda.widgets._multi_select import (
     MultiSelect,
     MultiSelectCurrent,
     MultiSelectOverlay,

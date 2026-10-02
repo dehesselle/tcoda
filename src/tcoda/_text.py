@@ -1,7 +1,7 @@
 """Small Rich-text helpers shared by the menu bar and the settings dialog.
 
 Neither hardcodes a colour: `mnemonic_text` reads the running app's theme
-accent, and `marker_text` takes whatever style the caller resolved. `tcw`
+accent, and `marker_text` takes whatever style the caller resolved. `tcoda`
 ships no palette of its own.
 """
 

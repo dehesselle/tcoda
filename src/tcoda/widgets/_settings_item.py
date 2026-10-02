@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tcw.widgets._menuitem import MenuItem
+from tcoda.widgets._menuitem import MenuItem
 
 
 class SettingsMenuItem(MenuItem):
@@ -26,8 +26,8 @@ class SettingsMenuItem(MenuItem):
         )
 
     async def _open(self) -> None:
-        # Imported here rather than at module scope: tcw.dialogs imports the
-        # settings machinery, and tcw.widgets must stay importable without it.
-        from tcw.dialogs import SettingsDialog
+        # Imported here rather than at module scope: tcoda.dialogs imports the
+        # settings machinery, and tcoda.widgets must stay importable without it.
+        from tcoda.dialogs import SettingsDialog
 
         await self.app.push_screen_wait(SettingsDialog())

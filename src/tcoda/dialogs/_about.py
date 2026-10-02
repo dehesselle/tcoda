@@ -21,7 +21,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Static
 
-from tcw.dialogs._dialog import Dialog
+from tcoda.dialogs._dialog import Dialog
 
 _HEADER_LINES = 5
 
@@ -72,7 +72,7 @@ class AboutDialog(Dialog[None]):
             text = self._path.read_text(encoding="utf-8")
         else:
             text = (
-                files("tcw.dialogs")
+                files("tcoda.dialogs")
                 .joinpath("about_default.txt")
                 .read_text(encoding="utf-8")
             )

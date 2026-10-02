@@ -5,7 +5,7 @@ it is attachable to any logger before a UI (or any Textual app) exists, and
 independently testable with nothing but the stdlib.
 
 It is deliberately unfiltered by default (`level=NOTSET`): filtering by
-level or source is a subscriber's concern (see `tcw.widgets.LogViewer`), not
+level or source is a subscriber's concern (see `tcoda.widgets.LogViewer`), not
 the sink's, so the same buffer can serve several differently-filtered views.
 Level, source and timestamp survive on each buffered `LogEntry` as queryable
 fields rather than being baked into `line`'s formatted text, so a subscriber

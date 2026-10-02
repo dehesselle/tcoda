@@ -13,7 +13,7 @@ from textual.pilot import Pilot
 from textual.screen import Screen
 from textual.widgets import OptionList, Static
 
-from tcw.widgets import (
+from tcoda.widgets import (
     OPEN_ACTION,
     Footer,
     Menu,
@@ -21,7 +21,7 @@ from tcw.widgets import (
     MenuItem,
     MenuSeparator,
 )
-from tcw.widgets._dropdown import MenuBarOverlay, MenuDropdown
+from tcoda.widgets._dropdown import MenuBarOverlay, MenuDropdown
 
 
 def _menus() -> ComposeResult:

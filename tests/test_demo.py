@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Tree
 
-from tcw import settings as settings_module
-from tcw.demo import DemoApp
-from tcw.demo._app import BrowserScreen
-from tcw.demo._browser import FileTable, format_age, format_size
-from tcw.demo._filter import FilterDialog
-from tcw.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
-from tcw.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
-from tcw.settings import config
-from tcw.widgets import ChordViewer, Countdown, Header, LogViewer, MenuBar
+from tcoda import settings as settings_module
+from tcoda.demo import DemoApp
+from tcoda.demo._app import BrowserScreen
+from tcoda.demo._browser import FileTable, format_age, format_size
+from tcoda.demo._filter import FilterDialog
+from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
+from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
+from tcoda.settings import config
+from tcoda.widgets import ChordViewer, Countdown, Header, LogViewer, MenuBar
 
 SIZE = (120, 36)
 
@@ -41,7 +41,7 @@ async def test_it_lists_the_package_root() -> None:
         assert isinstance(app.screen, BrowserScreen)
         table = app.screen.query_one(FileTable)
         assert "__init__.py" in names(table)
-        assert str(app.screen.query_one(Header).middle.content) == "tcw"
+        assert str(app.screen.query_one(Header).middle.content) == "tcoda"
         assert status_text(app) == f"{table.row_count} files"
 
 
@@ -53,7 +53,7 @@ async def test_moving_in_the_tree_browses_that_directory() -> None:
         target = next(n for n in tree.root.children if n.label.plain == "widgets")
         tree.move_cursor(target)
         await pilot.pause()
-        assert app.screen.title == "tcw/widgets"
+        assert app.screen.title == "tcoda/widgets"
         assert "_footer.py" in names(app.screen.query_one(FileTable))
 
 

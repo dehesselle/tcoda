@@ -5,7 +5,7 @@ VSCode-style bindings of several keystrokes in a row, declared in the ordinary
 because only the app sees a key before the focused widget does.
 
 ```python
-from tcw.chords import ChordMixin
+from tcoda.chords import ChordMixin
 
 
 class MyApp(ChordMixin, App[None]):

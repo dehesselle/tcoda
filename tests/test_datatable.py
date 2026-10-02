@@ -16,7 +16,7 @@ from textual.app import App, ComposeResult
 from textual.coordinate import Coordinate
 from textual.widgets.data_table import ColumnKey, RowKey
 
-from tcw.widgets import DataTable
+from tcoda.widgets import DataTable
 
 #: Rows used by most of the tests: deliberately neither in key order nor in
 #: name order, so a passing sort cannot be the order they went in.
@@ -468,7 +468,7 @@ async def test_clearing_the_table_drops_the_tooltip() -> None:
 
 
 async def test_the_default_tooltip_is_none() -> None:
-    """A plain tcw DataTable behaves exactly as Textual's does."""
+    """A plain tcoda DataTable behaves exactly as Textual's does."""
     app = Harness()
     async with app.run_test() as pilot:
         table = app.query_one(DataTable)

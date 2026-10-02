@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 from textual.widgets import Tree
 
-from tcw.demo._settings import SIZE_UNITS
-from tcw.settings import config
-from tcw.widgets import DataTable, Resizable
+from tcoda.demo._settings import SIZE_UNITS
+from tcoda.settings import config
+from tcoda.widgets import DataTable, Resizable
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

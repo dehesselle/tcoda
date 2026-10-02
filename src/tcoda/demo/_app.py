@@ -1,5 +1,5 @@
-"""The demo app: a small browser over tcw's own source files, wearing every
-widget and reaching every dialog tcw has."""
+"""The demo app: a small browser over tcoda's own source files, wearing every
+widget and reaching every dialog tcoda has."""
 
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Tree
 
-import tcw
-from tcw.chords import ChordMixin
-from tcw.demo._browser import FileInfo, FileTable, Sidebar, scan
-from tcw.demo._filter import FilterDialog
-from tcw.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
-from tcw.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
-from tcw.settings import config
-from tcw.widgets import (
+import tcoda
+from tcoda.chords import ChordMixin
+from tcoda.demo._browser import FileInfo, FileTable, Sidebar, scan
+from tcoda.demo._filter import FilterDialog
+from tcoda.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
+from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
+from tcoda.settings import config
+from tcoda.widgets import (
     OPEN_ACTION,
     TOGGLE_ACTION,
     AboutMenuItem,
@@ -42,15 +42,15 @@ from tcw.widgets import (
     SettingsMenuItem,
 )
 
-#: What the demo browses: the installed `tcw` package itself.
-ROOT = Path(tcw.__file__).parent
+#: What the demo browses: the installed `tcoda` package itself.
+ROOT = Path(tcoda.__file__).parent
 ABOUT = Path(__file__).with_name("about.txt")
 
 # Several loggers, so the LogViewer's source filter has something to filter.
-log = logging.getLogger("tcw.demo")
-refresh_log = logging.getLogger("tcw.demo.refresh")
-table_log = logging.getLogger("tcw.demo.table")
-dialog_log = logging.getLogger("tcw.demo.dialogs")
+log = logging.getLogger("tcoda.demo")
+refresh_log = logging.getLogger("tcoda.demo.refresh")
+table_log = logging.getLogger("tcoda.demo.table")
+dialog_log = logging.getLogger("tcoda.demo.dialogs")
 
 
 class BrowserScreen(Screen[None]):
@@ -96,8 +96,8 @@ class BrowserScreen(Screen[None]):
         self._pattern = ""
 
     def compose(self) -> ComposeResult:
-        yield Header(left="tcw demo", right=f"v{tcw.__version__}")
-        with MenuBar(trailing=f"tcw {tcw.__version__}"):
+        yield Header(left="tcoda demo", right=f"v{tcoda.__version__}")
+        with MenuBar(trailing=f"tcoda {tcoda.__version__}"):
             with Menu("File", id="file"):
                 yield MenuItem("Refresh now", id="refresh", mnemonic="r", shortcut="F5")
                 yield MenuSeparator()
@@ -127,7 +127,9 @@ class BrowserScreen(Screen[None]):
                 )
                 yield MenuItem("Show hidden files", id="hidden", disabled=True)
             with Menu("Help", id="help"):
-                yield AboutMenuItem(path=ABOUT, variables={"version": tcw.__version__})
+                yield AboutMenuItem(
+                    path=ABOUT, variables={"version": tcoda.__version__}
+                )
         with Horizontal(id="browser"):
             yield Sidebar(ROOT, id="sidebar")
             yield FileTable(id="files")
@@ -140,7 +142,7 @@ class BrowserScreen(Screen[None]):
         # Children are mounted by now, LogViewer's sink included, so none of
         # this is lost. The DEBUG line is: LogViewer starts at INFO, and a
         # level nobody had asked for yet is gone for good.
-        log.info("tcw %s on Textual %s", tcw.__version__, textual.__version__)
+        log.info("tcoda %s on Textual %s", tcoda.__version__, textual.__version__)
         log.debug("browsing %s", ROOT)
         log.info("press ctrl+k and wait a moment to see every chord")
         self._browse(ROOT)
@@ -273,7 +275,7 @@ class BrowserScreen(Screen[None]):
 
     @on(HeaderArea.Clicked, "#header-right")
     def _header_right_clicked(self) -> None:
-        versions = f"tcw {tcw.__version__}, Textual {textual.__version__}"
+        versions = f"tcoda {tcoda.__version__}, Textual {textual.__version__}"
         log.info("header clicked: %s", versions)
         self.notify(versions, title="Versions")
 
@@ -328,16 +330,18 @@ class BrowserScreen(Screen[None]):
         self._show(self._files)
 
     def action_about(self) -> None:
-        self.app.push_screen(AboutDialog(ABOUT, variables={"version": tcw.__version__}))
+        self.app.push_screen(
+            AboutDialog(ABOUT, variables={"version": tcoda.__version__})
+        )
 
     def action_settings(self) -> None:
         self.app.push_screen(SettingsDialog())
 
 
 class DemoApp(ChordMixin, App[None]):
-    """Run with `python -m tcw`."""
+    """Run with `python -m tcoda`."""
 
-    TITLE = "tcw demo"
+    TITLE = "tcoda demo"
 
     def get_default_screen(self) -> Screen[None]:
         return BrowserScreen()

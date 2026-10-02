@@ -30,16 +30,16 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcw.chords import ChordMixin, Steps, chord_groups, chord_steps
-from tcw.widgets._footer import natural_key
-from tcw.widgets._layers import install_layer
+from tcoda.chords import ChordMixin, Steps, chord_groups, chord_steps
+from tcoda.widgets._footer import natural_key
+from tcoda.widgets._layers import install_layer
 
 if TYPE_CHECKING:
     from rich.style import Style
     from textual.timer import Timer
 
-#: The layer this widget adds to its host screen -- see `tcw.widgets._layers`.
-_LAYER = "_tcw_chord_viewer"
+#: The layer this widget adds to its host screen -- see `tcoda.widgets._layers`.
+_LAYER = "_tcoda_chord_viewer"
 
 
 @dataclass(frozen=True)
@@ -188,7 +188,7 @@ class ChordViewer(Widget, can_focus=False, can_focus_children=False):
         /* Capped here rather than on the columns: an auto height ignores a
            child's max-height and grows to the child's whole content. */
         max-height: 50vh;
-        layer: _tcw_chord_viewer;
+        layer: _tcoda_chord_viewer;
         background: $panel;
     }
     ChordViewer > #chord-viewer-columns {

@@ -4,9 +4,9 @@ before anything reads one."""
 
 from __future__ import annotations
 
-from tcw.settings import Setting, SettingAction, config, configure
+from tcoda.settings import Setting, SettingAction, config, configure
 
-configure("tcw-demo")
+configure("tcoda-demo")
 
 AUTO_REFRESH = Setting(
     key="auto_refresh",

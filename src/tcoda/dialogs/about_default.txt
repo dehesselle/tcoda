@@ -1,7 +1,7 @@
-    __
-   |  |_.----.--.--.--.     Textual Common Widgets
-   |   _|  __|  |  |  |
-   |____|____|________|
+    __                 __
+   |  |_.----.-----.--|  |.---.-.   Textual coda
+   |   _|  __|  _  |  _  ||  _  |
+   |____|____|_____|_____||___._|
 
 Shared widgets and dialogs for our Textual apps.
 

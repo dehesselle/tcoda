@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from rich.cells import cell_len
 
-from tcw._text import marker_text
-from tcw.settings import (
+from tcoda._text import marker_text
+from tcoda.settings import (
     ConfigStore,
     Setting,
     SettingAction,
@@ -268,6 +268,6 @@ def test_a_marker_and_its_absence_are_the_same_width() -> None:
 
 
 def test_a_marker_carries_the_style_it_was_given() -> None:
-    """`tcw` picks no colour of its own; the caller resolves one."""
+    """`tcoda` picks no colour of its own; the caller resolves one."""
     marked = marker_text("◐", "bold magenta", present=True)
     assert marked.style == "bold magenta"

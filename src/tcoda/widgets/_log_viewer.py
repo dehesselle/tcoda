@@ -2,7 +2,7 @@
 whatever the host app writes through the stdlib `logging` module -- no
 logfile, no tailing.
 
-`InMemoryLogHandler` (see `tcw.log_sink`) owns the rolling buffer and is
+`InMemoryLogHandler` (see `tcoda.log_sink`) owns the rolling buffer and is
 independent of any widget being mounted, so nothing emitted before a
 `LogViewer` exists is lost -- it is replayed on mount. Filtering by level and
 source happens here, at render time, against that buffer -- the sink itself
@@ -22,9 +22,9 @@ from textual.widget import Widget
 from textual.widgets import RichLog, Select
 from textual.widgets.selection_list import Selection
 
-from tcw.log_sink import InMemoryLogHandler, LogEntry
-from tcw.widgets._layers import install_layer
-from tcw.widgets._multi_select import MultiSelect
+from tcoda.log_sink import InMemoryLogHandler, LogEntry
+from tcoda.widgets._layers import install_layer
+from tcoda.widgets._multi_select import MultiSelect
 
 #: The action `LogViewer` installs on its screen -- see `MenuBar.OPEN_ACTION`
 #: for the identical pattern this mirrors.
@@ -32,8 +32,8 @@ TOGGLE_ACTION = "toggle_log_viewer"
 
 #: Reserved layer name this widget self-registers onto its host screen so it
 #: reliably paints above ordinary ("default"-layer) content -- see
-#: `tcw.widgets._layers`.
-_LAYER = "_tcw_log_viewer"
+#: `tcoda.widgets._layers`.
+_LAYER = "_tcoda_log_viewer"
 
 _LEVELS: list[tuple[str, int]] = [
     ("Debug", logging.DEBUG),
@@ -52,7 +52,7 @@ class LogViewer(Widget, can_focus=False):
     LogViewer {
         dock: top;
         height: 33%;
-        layer: _tcw_log_viewer;
+        layer: _tcoda_log_viewer;
         background: $surface;
         offset: 0 -100%;
         transition: offset 400ms in_out_cubic;
@@ -182,7 +182,7 @@ class LogViewer(Widget, can_focus=False):
         # A key binding cannot live on this widget: Textual only consults
         # the focus chain plus the screen and the app. So it installs
         # itself onto whichever screen it was mounted on, mirroring
-        # MenuBar.on_mount (src/tcw/widgets/_menubar.py).
+        # MenuBar.on_mount (src/tcoda/widgets/_menubar.py).
         screen = self.screen
         if not hasattr(screen, f"action_{TOGGLE_ACTION}"):
             setattr(screen, f"action_{TOGGLE_ACTION}", self.toggle)
@@ -247,7 +247,7 @@ class LogViewer(Widget, can_focus=False):
     @staticmethod
     def _display_line(entry: LogEntry) -> str:
         """Timestamp, level and source in front of the message -- `line`
-        itself deliberately carries none of them (see `tcw.log_sink`), so
+        itself deliberately carries none of them (see `tcoda.log_sink`), so
         composing the full display text is this widget's job, not the
         sink's."""
         # entry.created is a naive Unix timestamp (record.created); routing

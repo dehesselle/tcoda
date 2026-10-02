@@ -5,7 +5,7 @@ right areas. Styled like Textual's own `Header`, but with no icon and no clock,
 and the middle tracks the app/screen title live until `show_title=False`.
 
 ```python
-from tcw.widgets import Header, HeaderArea
+from tcoda.widgets import Header, HeaderArea
 
 
 class MainScreen(Screen):

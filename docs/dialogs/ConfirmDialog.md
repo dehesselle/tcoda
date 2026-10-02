@@ -5,7 +5,7 @@ so the next confirmation need not invent its own dialog.
 [`SettingsDialog`](SettingsDialog.md) uses it for its unsaved-changes guard.
 
 ```python
-from tcw.dialogs import ConfirmDialog
+from tcoda.dialogs import ConfirmDialog
 
 
 @work

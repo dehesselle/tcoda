@@ -11,9 +11,9 @@ from textual.binding import Binding, BindingType
 from textual.screen import Screen
 from textual.widgets import Static
 
-from tcw.chords import ChordMixin
-from tcw.widgets import ChordViewer, Footer
-from tcw.widgets._chord_viewer import ChordViewerEntry, _columns
+from tcoda.chords import ChordMixin
+from tcoda.widgets import ChordViewer, Footer
+from tcoda.widgets._chord_viewer import ChordViewerEntry, _columns
 
 
 class Harness(ChordMixin, App[None]):

@@ -6,7 +6,7 @@ the whole widget. Three apps grew the missing halves independently, and both
 halves turned out to be mostly workarounds for the same few Textual internals.
 
 ```python
-from tcw.widgets import DataTable
+from tcoda.widgets import DataTable
 
 
 class Files(DataTable):

@@ -7,7 +7,7 @@ letter is never ambiguous between "pick a menu" and "pick an item".
 Declared inline, like any other part of a Textual UI:
 
 ```python
-from tcw.widgets import Menu, MenuBar, MenuItem, MenuSeparator, SettingsMenuItem
+from tcoda.widgets import Menu, MenuBar, MenuItem, MenuSeparator, SettingsMenuItem
 
 
 class MainScreen(Screen):

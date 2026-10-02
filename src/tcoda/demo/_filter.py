@@ -1,4 +1,4 @@
-"""A dialog of the demo's own, built on tcw's `Dialog` chrome the way a
+"""A dialog of the demo's own, built on tcoda's `Dialog` chrome the way a
 consuming app would build one."""
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, Label, Static
 
-from tcw.dialogs import Dialog
+from tcoda.dialogs import Dialog
 
 
 class FilterDialog(Dialog[str | None]):

@@ -13,7 +13,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Tree
 
-from tcw.widgets import DataTable, Resizable
+from tcoda.widgets import DataTable, Resizable
 
 
 class Sidebar(Resizable, Tree[None]):

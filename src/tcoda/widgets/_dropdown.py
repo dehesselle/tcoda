@@ -25,10 +25,10 @@ from textual.screen import ModalScreen
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-from tcw.widgets._menuitem import Menu, MenuItem, MenuSeparator
+from tcoda.widgets._menuitem import Menu, MenuItem, MenuSeparator
 
 if TYPE_CHECKING:
-    from tcw.widgets._menubar import MenuBar
+    from tcoda.widgets._menubar import MenuBar
 
 
 @dataclass(frozen=True)

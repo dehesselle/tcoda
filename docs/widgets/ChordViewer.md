@@ -6,8 +6,8 @@ step, with the steps typed so far and a key legend on a line below. It needs a
 `ChordMixin` app.
 
 ```python
-from tcw.chords import ChordMixin
-from tcw.widgets import ChordViewer, Footer
+from tcoda.chords import ChordMixin
+from tcoda.widgets import ChordViewer, Footer
 
 
 class MyApp(ChordMixin, App[None]):

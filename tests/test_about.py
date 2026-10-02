@@ -11,12 +11,12 @@ from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widgets import Static
 
-from tcw.dialogs import AboutDialog
-from tcw.widgets import AboutMenuItem, Menu, MenuBar
+from tcoda.dialogs import AboutDialog
+from tcoda.widgets import AboutMenuItem, Menu, MenuBar
 
-# The only literal prose in the bundled header -- the "tcw" above it is
+# The only literal prose in the bundled header -- the "tcoda" above it is
 # ASCII art, which spells the name without containing the string.
-DEFAULT_HEADER_TEXT = "Textual Common Widgets"
+DEFAULT_HEADER_TEXT = "Textual coda"
 
 
 class Harness(App[None]):

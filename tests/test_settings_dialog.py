@@ -11,8 +11,8 @@ from textual.app import App
 from textual.pilot import Pilot
 from textual.widgets import Button, Input, Label, Select, Switch, Tree
 
-from tcw.dialogs import ConfirmDialog, SettingsDialog
-from tcw.settings import Setting, SettingAction, config
+from tcoda.dialogs import ConfirmDialog, SettingsDialog
+from tcoda.settings import Setting, SettingAction, config
 
 
 class Harness(App[None]):
@@ -323,7 +323,7 @@ async def test_a_per_instance_row_is_marked_and_a_global_one_is_padded() -> None
 
 
 async def test_the_marker_can_be_restyled_by_the_app() -> None:
-    """tcw owns *that* there is a marker; the app owns what it looks like."""
+    """tcoda owns *that* there is a marker; the app owns what it looks like."""
 
     class Restyled(SettingsDialog):
         INSTANCE_GLYPH = "*"

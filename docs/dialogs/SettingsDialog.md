@@ -2,11 +2,11 @@
 
 A tree of setting groups on the left, the selected group's editable entries on
 the right. It enumerates whatever has been declared with
-[`tcw.settings`](../settings.md), so adding a setting needs no wiring here at
+[`tcoda.settings`](../settings.md), so adding a setting needs no wiring here at
 all.
 
 ```python
-from tcw.widgets import Menu, MenuBar, SettingsMenuItem
+from tcoda.widgets import Menu, MenuBar, SettingsMenuItem
 
 
 class MainScreen(Screen):

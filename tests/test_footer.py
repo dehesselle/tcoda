@@ -11,7 +11,7 @@ from textual.pilot import Pilot
 from textual.screen import Screen
 from textual.widgets import Static
 
-from tcw.widgets import Countdown, Footer, FooterBinding
+from tcoda.widgets import Countdown, Footer, FooterBinding
 
 
 class Body(Static, can_focus=True):

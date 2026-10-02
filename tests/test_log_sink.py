@@ -8,7 +8,7 @@ import threading
 
 import pytest
 
-from tcw.log_sink import InMemoryLogHandler, LogEntry
+from tcoda.log_sink import InMemoryLogHandler, LogEntry
 
 
 def _logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
@@ -146,7 +146,7 @@ def test_a_broken_format_string_does_not_crash_emit(
 
 def test_the_handler_is_usable_via_plain_logging_addhandler() -> None:
     handler = InMemoryLogHandler()
-    logger = logging.getLogger("tcw-test-plain-stdlib")
+    logger = logging.getLogger("tcoda-test-plain-stdlib")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
     logger.addHandler(handler)

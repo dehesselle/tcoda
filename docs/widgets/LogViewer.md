@@ -6,7 +6,7 @@ last 30,000 lines a program has written through the stdlib `logging` module
 per-source checklist (default: all sources visible) narrow what's shown.
 
 ```python
-from tcw.widgets import LogViewer
+from tcoda.widgets import LogViewer
 
 
 class MainScreen(Screen):
@@ -16,7 +16,7 @@ class MainScreen(Screen):
 ```
 
 - **Zero-config by default.** `LogViewer()` creates its own in-memory sink
-  (`tcw.log_sink.InMemoryLogHandler`) and attaches it to the root logger.
+  (`tcoda.log_sink.InMemoryLogHandler`) and attaches it to the root logger.
   Pass `logger=` (a `logging.Logger` or a name) to attach somewhere else
   instead. Pass an existing `handler=` -- typically one attached at process
   startup, before any UI existed -- to skip all of that: the viewer then
@@ -42,7 +42,7 @@ class MainScreen(Screen):
   it was hidden. Lowering the level dropdown has no equivalent: a level
   suppressed upstream before you asked for it is gone for good.
 
-## The sink: `tcw.log_sink`
+## The sink: `tcoda.log_sink`
 
 `InMemoryLogHandler` is a plain `logging.Handler` with no Textual import, so it
 can be attached to a logger before any UI exists and tested with nothing but
@@ -51,7 +51,7 @@ the stdlib.
 ```python
 import logging
 
-from tcw.log_sink import InMemoryLogHandler
+from tcoda.log_sink import InMemoryLogHandler
 
 sink = InMemoryLogHandler()  # capacity=30_000
 logging.getLogger().addHandler(sink)

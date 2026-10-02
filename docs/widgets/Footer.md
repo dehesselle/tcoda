@@ -7,7 +7,7 @@ rest, and a status corner — each of which is optional. Left alone, it behaves
 like the stock footer.
 
 ```python
-from tcw.widgets import Countdown, Footer, OPEN_ACTION
+from tcoda.widgets import Countdown, Footer, OPEN_ACTION
 
 
 class MainScreen(Screen):

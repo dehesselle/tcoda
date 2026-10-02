@@ -1,10 +1,10 @@
-    __
-   |  |_.----.--.--.--.     Textual Common Widgets
-   |   _|  __|  |  |  |     demo, version $version
-   |____|____|________|
+    __                 __
+   |  |_.----.-----.--|  |.---.-.   Textual coda
+   |   _|  __|  _  |  _  ||  _  |   demo
+   |____|____|_____|_____||___._|   v$version
 
 This is an AboutDialog, reading its text from
-src/tcw/demo/about.txt.
+src/tcoda/demo/about.txt.
 
 The five lines above are a fixed header. The
 rest is the body, which scrolls once it grows
@@ -15,7 +15,7 @@ placeholder, filled in through
 AboutMenuItem(variables=...).
 
 Everything in this demo is ordinary consumer
-code: read src/tcw/demo/ to see how each widget
+code: read src/tcoda/demo/ to see how each widget
 and dialog is used.
 
 Press escape to close.
