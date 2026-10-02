@@ -13,6 +13,7 @@ from textual.pilot import Pilot
 from textual.screen import Screen
 from textual.widgets import OptionList, Static
 
+from tcoda.chords import ChordMixin
 from tcoda.widgets import (
     OPEN_ACTION,
     Footer,
@@ -29,7 +30,7 @@ def _menus() -> ComposeResult:
         with Menu("File", id="file"):
             yield MenuItem("Open...", id="open", mnemonic="o")
             yield MenuSeparator()
-            yield MenuItem("Save", id="save", mnemonic="s", shortcut="Ctrl+S")
+            yield MenuItem("Save", id="save", mnemonic="s", shortcut="ctrl+s")
             yield MenuItem("Locked", id="locked", mnemonic="l", disabled=True)
         with Menu("Help", id="help"):
             yield MenuItem("About", id="about", mnemonic="a")
@@ -420,21 +421,46 @@ async def test_moving_down_skips_the_separator() -> None:
         )
 
 
+async def rendered_save_item(app: App[None], pilot: Pilot[None]) -> str:
+    """Open the File menu and return its Save row as plain text."""
+    await pilot.press("f9")
+    await settle(pilot)
+    await pilot.press("enter")
+    await settle(pilot)
+    prompt = app.screen.query_one(OptionList).get_option("save").prompt
+    return "".join(segment.text for segment in app.console.render(prompt))
+
+
 async def test_a_shortcut_is_shown_right_aligned() -> None:
     app = Harness()
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.press("f9")
-        await settle(pilot)
-        await pilot.press("enter")
-        await settle(pilot)
-        prompt = app.screen.query_one(OptionList).get_option("save").prompt
-        rendered = "".join(
-            segment.text
-            for segment in app.screen.query_one(OptionList).app.console.render(prompt)
-        )
+        rendered = await rendered_save_item(app, pilot)
         assert "Save" in rendered
+        assert "^s" in rendered
+        assert rendered.index("Save") < rendered.index("^s")
+
+
+async def test_a_shortcut_follows_the_apps_key_display() -> None:
+    class Spelled(Harness):
+        def get_key_display(self, binding: Binding) -> str:
+            return binding.key.title()
+
+    app = Spelled()
+    async with app.run_test(size=(80, 24)) as pilot:
+        rendered = await rendered_save_item(app, pilot)
         assert "Ctrl+S" in rendered
-        assert rendered.index("Save") < rendered.index("Ctrl+S")
+
+
+async def test_a_chord_shortcut_is_shown_step_by_step() -> None:
+    class Chorded(ChordMixin, App[None]):
+        def compose(self) -> ComposeResult:
+            with MenuBar(), Menu("File", id="file"):
+                yield MenuItem("Save", id="save", shortcut="ctrl+k ctrl+s")
+
+    app = Chorded()
+    async with app.run_test(size=(80, 24)) as pilot:
+        rendered = await rendered_save_item(app, pilot)
+        assert "^k ^s" in rendered
 
 
 async def test_a_disabled_item_cannot_be_chosen_by_its_mnemonic() -> None:

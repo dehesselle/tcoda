@@ -60,6 +60,19 @@ one.
 - `show_key=False` keeps the binding out of the footer altogether, but *where*
   it appears is never the widget's business — that is the footer's.
 
+## Keys are shown through `App.get_key_display`
+
+No widget formats a key itself. The [`Footer`](widgets/Footer.md), the
+[`ChordViewer`](widgets/ChordViewer.md), the [chord](chords.md) status text
+and a [`MenuItem`](widgets/MenuBar.md)'s shortcut all take a key in `Binding`
+syntax and ask the app how to show it. Textual's answer is caret notation:
+`^q`, `^k ^s`, lowercase `f5`, `esc`.
+
+So the style is the app's choice, made once. An app that prefers `Ctrl+Q`
+overrides `get_key_display` and every one of these follows, along with
+Textual's own footer and key panel. A widget that accepted
+pre-formatted text instead would be the one place that does not.
+
 ## Hide with `display`, never with an empty render
 
 A widget that has nothing to show is hidden with `display = False`, not by

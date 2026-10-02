@@ -99,17 +99,21 @@ class BrowserScreen(Screen[None]):
         yield Header(left="tcoda demo", right=f"v{tcoda.__version__}")
         with MenuBar(trailing=f"tcoda {tcoda.__version__}"):
             with Menu("File", id="file"):
-                yield MenuItem("Refresh now", id="refresh", mnemonic="r", shortcut="F5")
+                yield MenuItem("Refresh now", id="refresh", mnemonic="r", shortcut="f5")
                 yield MenuSeparator()
-                yield SettingsMenuItem(shortcut="^k d s")
+                yield SettingsMenuItem(shortcut="ctrl+k d s")
                 yield MenuSeparator()
                 yield MenuItem(
-                    "Quit", id="quit", mnemonic="q", shortcut="^q", action="app.quit"
+                    "Quit",
+                    id="quit",
+                    mnemonic="q",
+                    shortcut="ctrl+q",
+                    action="app.quit",
                 )
             with Menu("Dialogs", id="dialogs"):
                 yield MenuItem("Confirm ...", id="confirm", mnemonic="c")
                 yield MenuItem("Delete files ...", id="delete", mnemonic="d")
-                yield MenuItem("Filter ...", id="filter", mnemonic="f", shortcut="F2")
+                yield MenuItem("Filter ...", id="filter", mnemonic="f", shortcut="f2")
             with Menu("View", id="view"):
                 # `action=` strings run on this screen, like a key binding's.
                 yield MenuItem("Sort by name", id="sort-name", action="sort('name')")
@@ -120,7 +124,7 @@ class BrowserScreen(Screen[None]):
                 yield MenuItem("Unsorted", id="sort-none", action="sort('')")
                 yield MenuSeparator()
                 yield MenuItem(
-                    "Log", id="log", mnemonic="l", shortcut="F1", action=TOGGLE_ACTION
+                    "Log", id="log", mnemonic="l", shortcut="f1", action=TOGGLE_ACTION
                 )
                 yield MenuItem(
                     "Theme ...", id="theme", mnemonic="t", action="app.change_theme"

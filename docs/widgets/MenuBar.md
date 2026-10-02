@@ -16,7 +16,7 @@ class MainScreen(Screen):
             with Menu("File", id="file"):
                 yield MenuItem("Open...", id="open", mnemonic="o")
                 yield MenuSeparator()
-                yield MenuItem("Save", id="save", mnemonic="s", shortcut="Ctrl+S")
+                yield MenuItem("Save", id="save", mnemonic="s", shortcut="ctrl+s")
                 yield SettingsMenuItem()
                 yield MenuItem("Quit", id="quit", mnemonic="q", action="app.quit")
 
@@ -44,6 +44,12 @@ class MainScreen(Screen):
   Where the key *appears* is not the bar's business: pin it with
   [`Footer(pinned=(OPEN_ACTION,))`](Footer.md). Under a stock `Footer` it lands
   in focus-chain order like anything else.
+- **A shortcut is a key, not a label.** `shortcut=` is written the way a
+  `Binding` key is (`"ctrl+s"`, `"f5"`, `"ctrl+k d s"`) and shown through
+  `App.get_key_display` — `^s`, `f5`, `^k d s` by default — so it reads the
+  same as the [`Footer`](Footer.md). It only advertises the key; the binding
+  itself lives in `BINDINGS` as usual. See
+  [DESIGN.md](../DESIGN.md#keys-are-shown-through-appget_key_display).
 - **Ids are CSS ids.** Textual only needs a `MenuItem` id to be unique among
   one menu's children, but an app stylesheet rule of the same name will style
   it — which, for a widget inside a one-row bar, shows up as a garbled bar

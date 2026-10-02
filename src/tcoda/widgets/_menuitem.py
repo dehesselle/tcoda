@@ -27,6 +27,7 @@ from rich.table import Table
 from rich.text import Text
 from textual import events
 from textual.app import App
+from textual.binding import Binding
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -104,8 +105,11 @@ class MenuItem(Widget):
                 Located in `label` by search, so it need not be the first
                 character.
             shortcut: Advertises a key binding that does the same thing,
-                shown dimmed and right-aligned. Purely a label -- the binding
-                itself lives wherever bindings live.
+                shown dimmed and right-aligned. Written as a binding key
+                (`"ctrl+s"`, `"f5"`, `"ctrl+k d s"`) and displayed the way the
+                app displays keys -- `App.get_key_display` -- so it matches
+                the footer. Purely a label -- the binding itself lives
+                wherever bindings live.
             disabled: See the `disabled` reactive.
             action: Optionally run this as well as posting `Pressed`.
         """
@@ -147,7 +151,8 @@ class MenuItem(Widget):
         grid = Table.grid(expand=True)
         grid.add_column()
         grid.add_column(justify="right")
-        grid.add_row(label, Text(self.shortcut, style="dim"))
+        shortcut = app.get_key_display(Binding(self.shortcut, ""))
+        grid.add_row(label, Text(shortcut, style="dim"))
         return grid
 
 
