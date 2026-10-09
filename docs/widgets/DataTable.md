@@ -1,9 +1,10 @@
 # Data table
 
-Textual's `DataTable` does not sort and has no per-cell tooltips: clicking a
-header posts `HeaderSelected` and stops there, and `tooltip` is a property of
-the whole widget. Three apps grew the missing halves independently, and both
-halves turned out to be mostly workarounds for the same few Textual internals.
+Textual's `DataTable` does not sort and has no per-cell or per-header
+tooltips: clicking a header posts `HeaderSelected` and stops there, and
+`tooltip` is a property of the whole widget. Three apps grew the missing
+halves independently, and both halves turned out to be mostly workarounds for
+the same few Textual internals.
 
 ```python
 from tcoda.widgets import DataTable
@@ -13,7 +14,7 @@ class Files(DataTable):
     def __init__(self, entries):
         super().__init__()
         self.entries = entries
-        self.add_column("Name", key="name", sortable=True)
+        self.add_column("Name", key="name", sortable=True, tooltip="FILE_NAME")
         self.add_column(
             "Size",
             key="size",
@@ -72,6 +73,12 @@ class Files(DataTable):
 
 ## Tooltips
 
+- **`add_column(tooltip=...)` gives a header its own tooltip**: the full name
+  behind a header kept short to save width. It is a plain value rather than a
+  hook, because a header's tooltip is fixed and known when the column is added,
+  and an argument also serves a column with no explicit key. It is held by
+  column key, so it survives sorting rewriting the header's indicator, and
+  `remove_column` / `clear(columns=True)` drop it along with the column.
 - **`get_cell_tooltip` is handed resolved keys, not a `Coordinate`.** Resolving
   the coordinate and guarding against it going stale mid-repaint is the
   boilerplate this exists to absorb. Return `None` for no tooltip; rendering
@@ -84,3 +91,6 @@ class Files(DataTable):
 - **A tooltip is cleared over filler space.** `DataTable` returns early without
   touching `hover_coordinate` when the mouse is over space carrying no
   row/column meta, so one set over a real cell would otherwise stick forever.
+- **Tooltips need a shown cursor.** Cell and header tooltips alike follow
+  `hover_coordinate`, which Textual only tracks while `show_cursor` is on and
+  `cursor_type` is not `"none"`.

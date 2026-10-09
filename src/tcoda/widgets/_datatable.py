@@ -1,15 +1,15 @@
 """A `DataTable` that sorts by its own headers and tooltips its own cells.
 
 Textual's table does neither. Clicking a header posts `HeaderSelected` and
-stops there; a tooltip is a property of the whole widget, not of a cell. Three
-apps grew the missing halves independently, and both halves turn out to be
-mostly workarounds for the same handful of Textual internals::
+stops there; a tooltip is a property of the whole widget, not of a cell or a
+header. Three apps grew the missing halves independently, and both halves turn
+out to be mostly workarounds for the same handful of Textual internals::
 
     class Files(DataTable):
         def __init__(self, entries):
             super().__init__()
             self.entries = entries
-            self.add_column("Name", key="name", sortable=True)
+            self.add_column("Name", key="name", sortable=True, tooltip="FILE_NAME")
             self.add_column("Size", key="size", sortable=True,
                             sort_key=lambda key: self.entries[key.value].size)
 
@@ -17,7 +17,8 @@ mostly workarounds for the same handful of Textual internals::
             return self.entries[row_key.value].full_path
 
 `sortable=True` makes a header clickable and gives it an indicator; the widget
-then reorders the rows itself. `sort_key` says how a *row* is ranked -- it is
+then reorders the rows itself. `tooltip` is the header's own tooltip -- the
+full name behind a header kept short to save width. `sort_key` says how a *row* is ranked -- it is
 handed the `RowKey`, not the cell, so a column showing "7.2K" or "2 days ago"
 ranks by the number behind it rather than by the text in front of it. For an
 ordering no key function can express -- directories before files, with the
@@ -74,7 +75,8 @@ def _orderable(value: Any) -> Any:
 
 
 class DataTable(TextualDataTable[Any]):
-    """Textual's `DataTable`, plus sortable headers and per-cell tooltips."""
+    """Textual's `DataTable`, plus sortable headers and per-cell and per-header
+    tooltips."""
 
     #: The sort indicators, deliberately not configurable: one look across
     #: every app that uses this. All three are one cell wide, which is what
@@ -119,6 +121,9 @@ class DataTable(TextualDataTable[Any]):
         #: Header labels without their indicator, so redecorating is not a
         #: matter of stripping a glyph back off again.
         self._sort_labels: dict[ColumnKey, Text] = {}
+        #: Header tooltips, by column. Kept here rather than on Textual's
+        #: `Column`, which has no field for one.
+        self._header_tooltips: dict[ColumnKey, VisualType] = {}
         #: Set when rows arrive, so an active sort is reapplied once on idle
         #: rather than once per `add_row`.
         self._resort_pending = False
@@ -134,6 +139,7 @@ class DataTable(TextualDataTable[Any]):
         default: Any | None = None,
         sortable: bool = False,
         sort_key: Callable[[RowKey], Any] | None = None,
+        tooltip: VisualType | None = None,
     ) -> ColumnKey:
         """
         Args:
@@ -145,6 +151,10 @@ class DataTable(TextualDataTable[Any]):
             sort_key: How to rank a row by this column. Called with a `RowKey`,
                 not a cell -- look the row up in your own model. Omit it to
                 rank by the cell's own value. Requires `sortable`.
+            tooltip: Shown while the mouse is over the header. A plain value
+                rather than a hook like `get_cell_tooltip`: a header's tooltip
+                is fixed and known now, and an argument also serves a column
+                with no explicit key.
 
         Returns:
             The key identifying the column.
@@ -155,7 +165,11 @@ class DataTable(TextualDataTable[Any]):
             # argument is a worse surprise than being told to pick one.
             raise ValueError("sort_key requires sortable=True")
         if not sortable:
-            return super().add_column(label, width=width, key=key, default=default)
+            column_key = super().add_column(
+                label, width=width, key=key, default=default
+            )
+            self._set_header_tooltip(column_key, tooltip)
+            return column_key
         if key is None:
             # `sort_column` and `SortChanged` both identify a column by its
             # key, and an auto-generated one carries no value to identify.
@@ -172,6 +186,7 @@ class DataTable(TextualDataTable[Any]):
         )
         self._sort_keys[column_key] = sort_key
         self._sort_labels[column_key] = base
+        self._set_header_tooltip(column_key, tooltip)
         if key == self.sort_column:
             self._redecorate()
         return column_key
@@ -180,12 +195,19 @@ class DataTable(TextualDataTable[Any]):
         key = column_key if isinstance(column_key, ColumnKey) else ColumnKey(column_key)
         self._sort_keys.pop(key, None)
         self._sort_labels.pop(key, None)
+        self._header_tooltips.pop(key, None)
         super().remove_column(column_key)
         if key.value is not None and key.value == self.sort_column:
             # Leaves the rows where they are: the column that ordered them is
             # gone, and reshuffling on a removal nobody asked about would be
             # more surprising than a stale-looking order.
             self.set_reactive(DataTable.sort_column, None)
+
+    def _set_header_tooltip(
+        self, column_key: ColumnKey, tooltip: VisualType | None
+    ) -> None:
+        if tooltip is not None:
+            self._header_tooltips[column_key] = tooltip
 
     def _indicated(self, label: Text, indicator: str) -> Text:
         return label.copy().append(f" {indicator}")
@@ -326,6 +348,7 @@ class DataTable(TextualDataTable[Any]):
         if columns:
             self._sort_keys.clear()
             self._sort_labels.clear()
+            self._header_tooltips.clear()
             self.set_reactive(DataTable.sort_column, None)
         super().clear(columns=columns)
         # Whatever the tooltip was describing is not there any more.
@@ -353,11 +376,19 @@ class DataTable(TextualDataTable[Any]):
 
     def _sync_tooltip(self) -> None:
         coordinate = self.hover_coordinate
-        # A negative row is the header and a negative column the row labels;
-        # neither is a cell, and `coordinate_to_cell_key` promises nothing
-        # sensible for them.
-        if coordinate.row < 0 or coordinate.column < 0:
+        # A negative column is the row labels, which have no tooltip; a
+        # negative row is the header. Neither is a cell, and
+        # `coordinate_to_cell_key` promises nothing sensible for them.
+        if coordinate.column < 0:
             self.tooltip = None
+            return
+        if coordinate.row < 0:
+            try:
+                column_key = self.ordered_columns[coordinate.column].key
+            except IndexError:
+                self.tooltip = None
+                return
+            self.tooltip = self._header_tooltips.get(column_key)
             return
         try:
             row_key, column_key = self.coordinate_to_cell_key(coordinate)

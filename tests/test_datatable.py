@@ -1,5 +1,5 @@
 """The table: sort state and its indicators, who orders the rows, and the
-per-cell tooltips.
+per-cell and per-header tooltips.
 
 The hover tests go through a real mouse position rather than assigning to
 `hover_coordinate`, because two of the things worth pinning down here -- a
@@ -73,6 +73,14 @@ async def hover_cell(pilot, table: DataTable, row: int, column: int) -> None:
     # what `pilot.hover`'s offset is measured against too.
     region = table._get_cell_region(Coordinate(row, column))
     await pilot.hover(table, offset=(region.x + 1, region.y))
+    await pilot.pause()
+
+
+async def hover_header(pilot, table: DataTable, column: int) -> None:
+    # `_get_cell_region` resolves body rows only; the header is the first
+    # line, and a column starts where the ones before it end.
+    x = sum(c.get_render_width(table) for c in table.ordered_columns[:column])
+    await pilot.hover(table, offset=(x + 1, 0))
     await pilot.pause()
 
 
@@ -476,3 +484,111 @@ async def test_the_default_tooltip_is_none() -> None:
         await pilot.pause()
         await hover_cell(pilot, table, 0, 0)
         assert table.tooltip is None
+
+
+def populate_with_header_tooltips(table: DataTable) -> None:
+    """`populate`'s columns, with tooltips on the two sortable headers only."""
+    table.add_column("Name", key="name", sortable=True, tooltip="FULL_NAME")
+    table.add_column("Size", key="size", sortable=True, tooltip="BYTES")
+    table.add_column("Note", key="note")
+    for key, name, size, _ in ROWS:
+        table.add_row(Text(name), Text(size), Text("note"), key=key)
+
+
+async def test_hovering_a_header_shows_its_tooltip() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        await pilot.pause()
+        await hover_header(pilot, table, 1)
+        assert table.tooltip == "BYTES"
+
+
+async def test_an_unsortable_header_can_have_a_tooltip_without_a_key() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("Plain", tooltip="PLAIN_FIELD")
+        table.add_row(Text("x"))
+        await pilot.pause()
+        await hover_header(pilot, table, 0)
+        assert table.tooltip == "PLAIN_FIELD"
+
+
+async def test_a_header_with_no_tooltip_clears_the_previous_one() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        await pilot.pause()
+        await hover_header(pilot, table, 0)
+        assert table.tooltip == "FULL_NAME"
+        await hover_header(pilot, table, 2)
+        assert table.tooltip is None
+
+
+async def test_a_header_keeps_its_tooltip_once_sorting_rewrites_its_glyph() -> None:
+    """Sorting rewrites the label in place; the tooltip is held by key, so
+    it must not care."""
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        table.sort_by("name", reverse=True)
+        await pilot.pause()
+        assert labels(table)[0] == f"Name {DataTable.SORT_DESCENDING}"
+        await hover_header(pilot, table, 0)
+        assert table.tooltip == "FULL_NAME"
+
+
+async def test_the_header_filler_right_of_the_last_column_clears_the_tooltip() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        await pilot.pause()
+        await hover_header(pilot, table, 0)
+        assert table.tooltip is not None
+        await pilot.hover(table, offset=(55, 0))
+        await pilot.pause()
+        assert table.tooltip is None
+
+
+async def test_moving_from_a_header_onto_a_cell_shows_the_cells_tooltip() -> None:
+    table = Tipped()
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        populate_with_header_tooltips(table)
+        await pilot.pause()
+        await hover_header(pilot, table, 0)
+        assert table.tooltip == "FULL_NAME"
+        await hover_cell(pilot, table, 0, 0)
+        assert table.tooltip == f"full {order(table)[0]}"
+
+
+async def test_removing_a_column_drops_its_header_tooltip() -> None:
+    """Re-added under the same key without one, it must not inherit the old
+    column's tooltip."""
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        table.remove_column("size")
+        table.add_column("Size", key="size")
+        await pilot.pause()
+        await hover_header(pilot, table, table.get_column_index("size"))
+        assert table.tooltip is None
+
+
+async def test_clearing_the_columns_drops_every_header_tooltip() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate_with_header_tooltips(table)
+        table.clear(columns=True)
+        populate(table)
+        await pilot.pause()
+        for column in range(3):
+            await hover_header(pilot, table, column)
+            assert table.tooltip is None
