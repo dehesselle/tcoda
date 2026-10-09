@@ -1,7 +1,8 @@
 # tcoda — Textual coda
 
-Widgets shared between several Textual apps (`snowcone`, `snakecam`, `vc`),
-extracted so a fix is made once rather than three times.
+> _A coda is a final part that brings something to a close, completing what came before it._
+
+tcoda is a widget library to extend Textual with things I regularly use in my projects.
 
 Consumed as an editable path dependency while it is still being tracked from
 source:
