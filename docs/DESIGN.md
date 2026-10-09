@@ -6,10 +6,9 @@ next to what it explains — see the tables in the [README](../README.md).
 
 ## Why tcoda exists
 
-The widgets here are shared between several Textual apps (`snowcone`,
-`snakecam`, `vc`), extracted so a fix is made once rather than three times.
-Most of what is here was grown independently in more than one app first,
-which is why several docs open by naming the workarounds the widget replaced.
+The widgets here are meant to be shared between Textual apps, so a fix is made
+once rather than in every app. Several docs open by naming the workarounds the
+widget replaces.
 
 The name is short for "Textual coda": what comes after the widgets Textual
 itself provides.

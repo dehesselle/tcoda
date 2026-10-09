@@ -276,6 +276,6 @@ def configure(app_name: str | None = None, *, path: Path | None = None) -> None:
     """Point the global `config` at an app's settings file.
 
     Call this once, from the app's own settings module, before anything reads
-    a setting: `configure("snowcone")`. Tests pass `path=` directly.
+    a setting: `configure("myapp")`. Tests pass `path=` directly.
     """
     config.configure(app_name, path=path)
