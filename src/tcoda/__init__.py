@@ -2,7 +2,8 @@
 
 Deliberately empty of imports: pulling in `tcoda` must not drag Textual (or a
 config file read) into a module that only wanted the version. Import from
-`tcoda.widgets`, `tcoda.dialogs`, `tcoda.settings` or `tcoda.chords` instead.
+`tcoda.widgets`, `tcoda.dialogs`, `tcoda.settings`, `tcoda.chords` or
+`tcoda.terminal_title` instead.
 """
 
 from tcoda.version import __version__

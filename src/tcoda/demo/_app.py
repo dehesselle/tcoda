@@ -24,6 +24,7 @@ from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
 from tcoda.settings import config
+from tcoda.terminal_title import TerminalTitleMixin
 from tcoda.widgets import (
     OPEN_ACTION,
     TOGGLE_ACTION,
@@ -342,10 +343,11 @@ class BrowserScreen(Screen[None]):
         self.app.push_screen(SettingsDialog())
 
 
-class DemoApp(ChordMixin, App[None]):
+class DemoApp(TerminalTitleMixin, ChordMixin, App[None]):
     """Run with `python -m tcoda`."""
 
     TITLE = "tcoda demo"
+    TERMINAL_TITLE = TITLE
 
     def get_default_screen(self) -> Screen[None]:
         return BrowserScreen()

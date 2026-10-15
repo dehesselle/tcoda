@@ -20,6 +20,7 @@ natural place. All of it is ordinary consumer code, so
 | [Countdown](widgets/Countdown.md) | Footer status corner. It spins during an auto-refresh. Turning auto-refresh off in the settings hides it. |
 | [LogViewer](widgets/LogViewer.md) | F1. Four `tcoda.demo.*` loggers write to it, so the source filter has something to filter. |
 | [Chords](chords.md) and [ChordViewer](widgets/ChordViewer.md) | `ctrl+k` then a pause lists every chord: `s …` sorts, `d …` opens each dialog, `r` refreshes, `t` changes theme. |
+| [Terminal title](terminal_title.md) | The terminal's window or tab title reads "tcoda demo" while the demo runs, and goes back to what it was on exit. |
 | [ConfirmDialog](dialogs/ConfirmDialog.md) | Dialogs → Confirm, and Delete files (the `danger=True, focus_cancel=True` variant, which deletes nothing). |
 | [Dialog](dialogs/Dialog.md) | Dialogs → Filter (F2): `FilterDialog`, the demo's own dialog on the shared chrome. |
 | [AboutDialog](dialogs/AboutDialog.md) | Help → About: the demo's own about-text, with `$version` filled in through `variables=`. |
