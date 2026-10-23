@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The menu bar: composition, auto-hide, the staged bar/dropdown flow,
 mnemonics, and how a chosen item reaches the app."""
 

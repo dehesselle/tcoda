@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A single-line header with independently clickable left/middle/right areas.
 
 Styled like Textual's own `Header` (same colors, and the same centered,

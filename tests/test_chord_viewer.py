@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """ChordViewer: when it shows, what it lists, how it lays it out, and holding
 the chord open while it is up."""
 

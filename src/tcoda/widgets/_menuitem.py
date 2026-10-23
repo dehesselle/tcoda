@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The declarative half of the menu bar: `Menu`, `MenuItem`, `MenuSeparator`.
 
 These are widgets rather than plain dataclasses so a menu can be *composed*

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Dragging a border: which presses start a drag, what the size becomes, and
 what the widget underneath is allowed to do while one is in progress.
 

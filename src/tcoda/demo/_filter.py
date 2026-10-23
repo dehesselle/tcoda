@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A dialog of the demo's own, built on tcoda's `Dialog` chrome the way a
 consuming app would build one."""
 

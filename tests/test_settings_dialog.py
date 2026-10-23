@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The settings dialog: what it lists, what it saves, and what it refuses."""
 
 from __future__ import annotations

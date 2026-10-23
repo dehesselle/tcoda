@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The footer: pinned keys, then whatever else is active, then app status.
 
 Textual's own `Footer` renders `screen.active_bindings` in focus-chain order,

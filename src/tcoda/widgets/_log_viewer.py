@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A log panel that slides down from the top over existing content, showing
 whatever the host app writes through the stdlib `logging` module -- no
 logfile, no tailing.

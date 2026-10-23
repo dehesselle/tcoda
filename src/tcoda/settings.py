@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Typed settings with a self-registering declaration.
 
 Declaring a `Setting` at module scope registers it, so the settings dialog can

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Resize a widget by dragging one of its own borders.
 
 Two apps had grown three copies of this between them -- two of them

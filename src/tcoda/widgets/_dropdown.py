@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The two modal stages of using the menu bar.
 
 Midnight-Commander style, and staged on purpose: `MenuBarOverlay` highlights

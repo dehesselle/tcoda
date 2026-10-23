@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Chord bindings: matching, abandoning, timing out, and staying out of the way
 of widgets that type."""
 

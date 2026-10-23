@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Small Rich-text helpers shared by the menu bar and the settings dialog.
 
 Neither hardcodes a colour: `mnemonic_text` reads the running app's theme

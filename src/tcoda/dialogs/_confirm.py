@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A generic yes/no question.
 
 Kept free of any particular question's vocabulary, so the next confirmation

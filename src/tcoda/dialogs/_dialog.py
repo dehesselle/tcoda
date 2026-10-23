@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Shared chrome for centered modal dialogs.
 
 Subclasses still set their own `#dialog` width/height -- those genuinely

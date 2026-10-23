@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The menu bar: a row of pulldown menu titles plus an optional trailing label.
 
 Composed declaratively -- see `tcoda.widgets._menuitem` -- and self-driving:

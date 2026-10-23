@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The demo app: a small browser over tcoda's own source files, wearing every
 widget and reaching every dialog tcoda has."""
 

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A `DataTable` that sorts by its own headers and tooltips its own cells.
 
 Textual's table does neither. Clicking a header posts `HeaderSelected` and

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """InMemoryLogHandler: structured buffering, the rolling capacity cap, and
 subscriber fan-out -- all plain stdlib `logging`, no Textual involved."""
 

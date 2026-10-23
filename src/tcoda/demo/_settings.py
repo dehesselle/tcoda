@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The demo's settings, declared the way a consuming app declares its own: at
 module scope, in a module that is always imported, with `configure()` called
 before anything reads one."""

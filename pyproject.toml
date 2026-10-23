@@ -1,8 +1,13 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 [project]
 name = "tcoda"
 dynamic = ["version"]
 description = "Textual coda: widgets, dialogs and helpers"
 readme = "README.md"
+license = "0BSD"
 authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
 dependencies = ["platformdirs>=4.11.0", "textual>=8.2.8,<9"]

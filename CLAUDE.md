@@ -10,6 +10,10 @@ This is a Textual-based library using Python 3.12. Use the `.venv` to call
 
 The codebase is ruff-formatted, `ruff` is available globally on this system.
 
+The project is REUSE-compliant (`reuse` is available globally). New files
+start with the SPDX header that `reuse annotate` writes; files that can't
+carry a comment get covered in `REUSE.toml`. `reuse lint` must pass.
+
 ## Documentation
 
 Every public widget, dialog and module has a doc under `docs/`. When changing

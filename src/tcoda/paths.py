@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Per-app config/cache/data locations and small JSON helpers.
 
 Every store built on these is an optimisation, never a dependency: an absent,

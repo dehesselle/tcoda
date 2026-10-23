@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """MultiSelect: the generic checkbox-dropdown mechanics -- open/close via
 click, keyboard and blur, toggling rows, compact mode, and scrolling a tall
 option list. Domain-specific integration (labels, hiding log sources) is

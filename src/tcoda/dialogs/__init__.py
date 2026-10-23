@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The dialogs: the shared `Dialog` chrome, a yes/no question, the settings
 UI, and the about box."""
 

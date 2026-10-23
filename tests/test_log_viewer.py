@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """LogViewer: replay/live delivery, the level and source filters, the
 sources popup, the self-installed toggle key, handler/logger ownership, and
 that the panel actually paints above other content once revealed."""

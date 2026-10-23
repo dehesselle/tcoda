@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The countdown: what it renders, and the spinner it drives itself.
 
 Deliberately no `Footer` anywhere in this file -- the widget is generic, and a

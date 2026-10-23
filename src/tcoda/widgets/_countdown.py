@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A seconds counter, with a spinner for while something is actually in flight.
 
 Two apps grew their own copy of this before it landed here. Neither the

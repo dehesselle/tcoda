@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The table: sort state and its indicators, who orders the rows, and the
 per-cell and per-header tooltips.
 

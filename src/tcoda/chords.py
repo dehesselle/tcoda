@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """Multi-keystroke ("chord") bindings, VSCode-style: `ctrl+k ctrl+s`.
 
 Chords are declared in the ordinary `BINDINGS`, steps separated by a space::

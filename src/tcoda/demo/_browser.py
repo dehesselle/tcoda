@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The two panes of the demo: a directory tree you can resize by dragging its
 border, and a sortable, tooltipped table of the selected directory's files."""
 

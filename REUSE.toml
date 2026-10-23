@@ -1,0 +1,14 @@
+version = 1
+
+# Files that can't carry an SPDX comment, or shouldn't: docs stay clean when
+# rendered, the about boxes are shown verbatim, uv.lock is regenerated.
+[[annotations]]
+path = [
+    "**.md",
+    "src/tcoda/**.txt",
+    "src/tcoda/py.typed",
+    "uv.lock",
+    ".python-version",
+]
+SPDX-FileCopyrightText = "2026 René de Hesselle <dehesselle@web.de>"
+SPDX-License-Identifier = "0BSD"

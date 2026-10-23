@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A rolling, structured, thread-safe log buffer with live fan-out.
 
 `InMemoryLogHandler` is a plain `logging.Handler` -- zero Textual import, so

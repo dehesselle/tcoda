@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The terminal's window title, set while the app runs and restored after.
 
     class MyApp(TerminalTitleMixin, App[None]):

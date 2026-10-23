@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """The tcoda demo: `python -m tcoda`, as `python -m textual` runs Textual's.
 
 A small browser over tcoda's own source files, built as ordinary consumer code

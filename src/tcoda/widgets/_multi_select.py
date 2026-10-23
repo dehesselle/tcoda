@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A checkbox dropdown, built the same way Textual's own `Select` is built.
 
 `Select` (`textual.widgets._select`) is not one widget but three cooperating

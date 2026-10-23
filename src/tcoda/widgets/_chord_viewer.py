@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
+#
+# SPDX-License-Identifier: 0BSD
+
 """A which-key style panel listing what can follow a pending chord.
 
 It appears only once the user hesitates, `delay` seconds into a chord, so
