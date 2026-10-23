@@ -13,7 +13,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Input, Static
 
-from tcoda.chords import ChordMixin, chord_groups
+from tcoda.chords import ChordMixin, Steps, chord_groups
 from tcoda.widgets import Footer, FooterBinding
 
 
@@ -247,12 +247,25 @@ async def test_chord_groups_follow_the_focus_chain() -> None:
         assert chord_groups(app.screen)[("ctrl+k",)] == "Field"
 
 
+class Holding(Harness):
+    #: Hold the next chord that starts, as soon as it starts.
+    hold_next = False
+
+    def watch_pending_chord(self, steps: Steps) -> None:
+        # After the key has been handled -- so the timeout is already armed
+        # and the hold has to stop it -- but before `pilot.press` returns,
+        # which on a loaded runner can take longer than the timeout itself.
+        if steps and self.hold_next:
+            self.hold_next = False
+            self.call_next(self.hold_chord)
+
+
 async def test_a_held_chord_does_not_time_out() -> None:
-    app = Harness()
+    app = Holding()
     app.CHORD_TIMEOUT = 0.1
+    app.hold_next = True
     async with app.run_test() as pilot:
         await pilot.press("ctrl+k")
-        app.hold_chord()
         await pilot.pause(0.3)
         assert app.pending_chord == ("ctrl+k",)
         # Nor does a further step re-arm the timeout.
