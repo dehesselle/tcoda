@@ -1,10 +1,8 @@
 # Countdown
 
 A seconds counter, with a braille spinner for while something is actually in
-flight. Two apps grew their own copy of this before it landed here. It is
-published separately and depends on nothing else in tcoda — the
-[`Footer`](Footer.md) status corner is a natural home, but put one wherever a
-wait needs a number.
+flight. It depends on nothing else in tcoda — the [`Footer`](Footer.md)
+status corner is a natural home, but put one wherever a wait needs a number.
 
 ```python
 from tcoda.widgets import Countdown

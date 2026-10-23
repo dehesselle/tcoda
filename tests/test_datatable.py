@@ -454,7 +454,7 @@ async def test_a_tooltip_follows_the_rows_when_they_are_reordered() -> None:
 
 async def test_a_sortable_column_still_tooltips_once_it_carries_a_glyph() -> None:
     """Identifying a column by its header text rather than its key breaks the
-    moment that header grows an indicator; this is the regression."""
+    moment that header grows an indicator; this guards against it."""
     table = Tipped()
     app = Harness(table)
     async with app.run_test() as pilot:

@@ -81,7 +81,7 @@ class PushedScreen(Screen[None]):
 
 class PushedHarness(App[None]):
     """The footer on an explicitly pushed screen -- `app.query_one` cannot see
-    it, which is what used to make this case special."""
+    it, which is why this case is covered."""
 
     def on_mount(self) -> None:
         self.push_screen(PushedScreen())

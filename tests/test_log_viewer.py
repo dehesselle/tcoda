@@ -40,7 +40,7 @@ class Harness(App[None]):
 
 def _lines(log: RichLog) -> list[str]:
     """Plain text of every rendered line -- `RichLog.lines` are `Strip`s, not
-    the plain `str` a `Log` widget's own `.lines` used to be."""
+    the plain `str`s a `Log` widget's own `.lines` holds."""
     return [strip.text for strip in log.lines]
 
 
@@ -195,8 +195,8 @@ async def test_display_line_carries_timestamp_level_and_source(
 async def test_a_long_statement_wraps_across_multiple_screen_lines(
     logger_name: str,
 ) -> None:
-    """The entire point of using RichLog over Log: a long SQL statement must
-    be readable in full without horizontal scrolling."""
+    """The entire point of using RichLog over Log: a long message must be
+    readable in full without horizontal scrolling."""
     app = Harness(logger=logger_name)
     async with app.run_test(size=(40, 24)) as pilot:
         await pilot.pause()

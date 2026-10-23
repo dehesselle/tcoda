@@ -4,9 +4,8 @@
 
 """A seconds counter, with a spinner for while something is actually in flight.
 
-Two apps grew their own copy of this before it landed here. Neither the
-counter nor the spinner is tied to a footer -- put one wherever a wait needs a
-number::
+Neither the counter nor the spinner is tied to a footer -- put one wherever a
+wait needs a number::
 
     yield Countdown(id="footer-countdown")
 

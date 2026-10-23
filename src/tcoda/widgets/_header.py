@@ -67,8 +67,8 @@ class Header(Widget, can_focus=False):
     # in left/right (a wide right area -- e.g. version + commit + timestamp --
     # would otherwise shove the "centered" middle text off-center, since it'd
     # only be centered in whatever space docking left it). The trade-off:
-    # left/right are now capped at a third of the width each and ellipsize
-    # like the middle already did, instead of always showing in full.
+    # left/right are capped at a third of the width each and ellipsize like
+    # the middle does, instead of always showing in full.
     DEFAULT_CSS = """
     Header {
         dock: top;
@@ -114,8 +114,8 @@ class Header(Widget, can_focus=False):
     ) -> None:
         """
         Args:
-            left: Initial text of the left area, docked to the screen edge.
-            right: Initial text of the right area, docked to the screen edge.
+            left: Initial text of the left area.
+            right: Initial text of the right area.
             show_title: See the `show_title` reactive.
             id: DOM id.
         """

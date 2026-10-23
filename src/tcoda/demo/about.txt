@@ -1,7 +1,7 @@
     __                 __
-   |  |_.----.-----.--|  |.---.-.   Textual coda
-   |   _|  __|  _  |  _  ||  _  |   demo
-   |____|____|_____|_____||___._|   v$version
+   |  |_.----.-----.--|  .---.-.   Textual coda
+   |   _|  __|  _  |  _  |  _  |   demo
+   |____|____|_____|_____|___._|   v$version
 
 This is an AboutDialog, reading its text from
 src/tcoda/demo/about.txt.

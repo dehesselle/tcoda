@@ -66,7 +66,7 @@ class PushedScreen(Screen[None]):
 
 class PushedHarness(App[None]):
     """The bar on a screen that was explicitly pushed -- `app.query_one`
-    cannot see it, which is what used to make this case special."""
+    cannot see it, which is why this case is covered."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -583,11 +583,10 @@ async def test_the_key_is_bound_on_the_screen_the_bar_is_mounted_on() -> None:
 async def test_the_key_can_be_pinned_to_the_head_of_the_footer() -> None:
     """Where the key *appears* is the app's call, not the bar's.
 
-    `MenuBar` used to re-insert its key at the front of the screen's own
-    binding map so a stock footer would render it first. That only ever
-    reordered the screen's bindings, so anything on the focused widget still
-    sorted ahead of it -- which is the case exercised here, and the reason
-    pinning replaced the trick outright.
+    Re-inserting the key at the front of the screen's own binding map would
+    not be enough: that only reorders the screen's bindings, so anything on
+    the focused widget still sorts ahead of it -- which is the case exercised
+    here, and why pinning is the mechanism.
     """
 
     class Focusable(Static, can_focus=True):

@@ -59,8 +59,8 @@ class MyApp(ChordMixin, App[None]):
   blank line above and below them (which-key's `win.padding`). The panel lays
   itself out again when the terminal is resized. It never takes more than
   half the screen; beyond that the entries scroll with the mouse wheel, and
-  the blank lines stay put. Keyboard scrolling would need its own mixin hook, because any key
-  that is not a next step abandons the chord.
+  the blank lines stay put. Keyboard scrolling would need its own mixin hook,
+  because any key that is not a next step abandons the chord.
 - **Clicking an entry presses its step**, so clicking a group descends into
   it, much like clicking a key in the footer.
 - **It covers the [footer](Footer.md)** rather than sitting above it. It is

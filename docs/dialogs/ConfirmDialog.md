@@ -29,5 +29,5 @@ async def _delete(self) -> None:
   variant instead of `primary`).
 - **`focus_cancel=True` puts the initial focus on the cancel button**, so a
   stray Enter cannot go through with something costly.
-- **Everything else is [`Dialog`](Dialog.md)'s** — the chrome, escape, and the
+- **Everything else is [`Dialog`](Dialog.md)'s** (the chrome and escape); the
   60-column width is its only styling of its own.

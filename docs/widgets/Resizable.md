@@ -1,9 +1,8 @@
 # Resizable
 
-Dragging a pane's border to resize it, which three widgets across two apps had
-grown their own copy of — two of them line for line, the third the same thing
-turned on its side. There is no handle widget and no splitter: the border the
-widget already draws *is* the grab area.
+Dragging a pane's border to resize it, along either axis. There is no handle
+widget and no splitter: the border the widget already draws *is* the grab
+area.
 
 ```python
 from textual.widgets import Tree
@@ -25,9 +24,8 @@ class Sidebar(Resizable, Tree):
   class, not across the MRO.
 - **A drag in progress calls `prevent_default()`**, which ends the MRO walk, so
   the widget underneath does not chase the pointer while a border is being
-  dragged. Before this, dragging a tree's border also drove the tree's hover
-  highlight, and a table that wanted both had to inline its drag handling into
-  the private `_on_mouse_move` to get the ordering right.
+  dragged. Without it, dragging a tree's border would also drive the tree's
+  hover highlight.
 - **The sibling needs no code at all.** Give this widget a starting size in
   `fr` and the sibling `1fr`; switching this one to a fixed cell size on drag
   leaves the sibling's `1fr` to claim the rest.

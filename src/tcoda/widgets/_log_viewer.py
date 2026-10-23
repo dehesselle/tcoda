@@ -30,8 +30,8 @@ from tcoda.log_sink import InMemoryLogHandler, LogEntry
 from tcoda.widgets._layers import install_layer
 from tcoda.widgets._multi_select import MultiSelect
 
-#: The action `LogViewer` installs on its screen -- see `MenuBar.OPEN_ACTION`
-#: for the identical pattern this mirrors.
+#: The action `LogViewer` installs on its screen -- see `OPEN_ACTION` in
+#: `tcoda.widgets._menubar` for the identical pattern this mirrors.
 TOGGLE_ACTION = "toggle_log_viewer"
 
 #: Reserved layer name this widget self-registers onto its host screen so it
@@ -151,8 +151,8 @@ class LogViewer(Widget, can_focus=False):
             )
         # `wrap=True`: a `Log` widget only ever crops a long line to the
         # viewport width, requiring horizontal scrolling to read the rest --
-        # painful for the very thing this exists to show in full, a long SQL
-        # statement. `RichLog` reflows onto further screen lines instead.
+        # painful for the very thing this exists to show in full, a long log
+        # message. `RichLog` reflows onto further screen lines instead.
         yield RichLog(id="log-viewer-log", wrap=True, highlight=False, markup=False)
 
     # ------------------------------------------------------------- mounting

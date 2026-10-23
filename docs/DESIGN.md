@@ -38,8 +38,7 @@ host app's own screens, such as its main one.
 
 Textual has no `Dialog` of its own — its vocabulary stops at `Screen` and
 `ModalScreen` — but it does not claim the term either, and everyone who has
-met Qt, GTK or wxWidgets already knows what a dialog is. The word carries
-more than the suffix did.
+met Qt, GTK or wxWidgets already knows what a dialog is.
 
 The shared chrome is [`Dialog`](dialogs/Dialog.md).
 

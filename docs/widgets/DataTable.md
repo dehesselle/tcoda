@@ -2,9 +2,8 @@
 
 Textual's `DataTable` does not sort and has no per-cell or per-header
 tooltips: clicking a header posts `HeaderSelected` and stops there, and
-`tooltip` is a property of the whole widget. Three apps grew the missing
-halves independently, and both halves turned out to be mostly workarounds for
-the same few Textual internals.
+`tooltip` is a property of the whole widget. Both halves turn out to be
+mostly workarounds for the same few Textual internals.
 
 ```python
 from tcoda.widgets import DataTable
@@ -50,7 +49,7 @@ class Files(DataTable):
   group. It is handed the row keys and the direction and returns the order
   outright; `column_sort_key()` gives back the ranking the column would have
   used. There is one sorting mechanism, and it goes all the way down.
-- **Every sortable header always carries an indicator** — `·` when it is not
+- **Every sortable header always carries an indicator** — `↕` when it is not
   the active column — so its rendered width never changes. This is
   load-bearing rather than decorative: `Column.content_width` is measured once
   at `add_column` and never recomputed from a label, so a header that only grew
@@ -85,9 +84,7 @@ class Files(DataTable):
   and placement stay Textual's.
 - **A tooltip is recomputed when the rows move under a stationary mouse.**
   `hover_coordinate` has not changed, so its watcher does not fire, and without
-  this the tooltip would go on describing the row that used to be there. No
-  table combining sorting and tooltips existed before this widget, which is why
-  nothing had hit it yet.
+  this the tooltip would go on describing the row that used to be there.
 - **A tooltip is cleared over filler space.** `DataTable` returns early without
   touching `hover_coordinate` when the mouse is over space carrying no
   row/column meta, so one set over a real cell would otherwise stick forever.

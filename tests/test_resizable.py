@@ -215,8 +215,8 @@ async def test_a_drag_does_not_feed_the_host_widgets_hover_tracking() -> None:
 
 
 async def test_a_resizable_table_still_sorts_and_tooltips() -> None:
-    """The combination that had no working example before this: nothing about
-    being resizable disturbs what the table itself does."""
+    """Resizable and sortable/tooltipped at once: nothing about being
+    resizable disturbs what the table itself does."""
 
     class Both(Resizable, DataTable):
         RESIZE_EDGE = "bottom"

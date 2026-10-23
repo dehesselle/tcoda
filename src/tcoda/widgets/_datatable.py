@@ -6,8 +6,8 @@
 
 Textual's table does neither. Clicking a header posts `HeaderSelected` and
 stops there; a tooltip is a property of the whole widget, not of a cell or a
-header. Three apps grew the missing halves independently, and both halves turn
-out to be mostly workarounds for the same handful of Textual internals::
+header. Both halves turn out to be mostly workarounds for the same handful of
+Textual internals::
 
     class Files(DataTable):
         def __init__(self, entries):
@@ -22,12 +22,12 @@ out to be mostly workarounds for the same handful of Textual internals::
 
 `sortable=True` makes a header clickable and gives it an indicator; the widget
 then reorders the rows itself. `tooltip` is the header's own tooltip -- the
-full name behind a header kept short to save width. `sort_key` says how a *row* is ranked -- it is
-handed the `RowKey`, not the cell, so a column showing "7.2K" or "2 days ago"
-ranks by the number behind it rather than by the text in front of it. For an
-ordering no key function can express -- directories before files, with the
-direction flipping only *within* each group -- override `sort_rows` and return
-the order outright.
+full name behind a header kept short to save width. `sort_key` says how a *row*
+is ranked -- it is handed the `RowKey`, not the cell, so a column showing
+"7.2K" or "2 days ago" ranks by the number behind it rather than by the text in
+front of it. For an ordering no key function can express -- directories before
+files, with the direction flipping only *within* each group -- override
+`sort_rows` and return the order outright.
 
 Two Textual details are load-bearing here, and are most of why this is a widget
 rather than a recipe:

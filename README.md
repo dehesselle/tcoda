@@ -4,14 +4,10 @@
 
 tcoda is a widget library to extend Textual with things I regularly use in my projects.
 
-Consumed as an editable path dependency while it is still being tracked from
-source:
+## Installation
 
-```toml
-dependencies = ["tcoda>=0.1"]
-
-[tool.uv.sources]
-tcoda = { path = "../tcoda", editable = true }
+```sh
+uv add tcoda      # or: pip install tcoda
 ```
 
 ## Demo

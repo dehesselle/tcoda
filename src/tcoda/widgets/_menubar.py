@@ -132,10 +132,10 @@ class MenuBar(Widget, can_focus=False):
             self._key_description,
             show=self._show_key,
         )
-        # Where the key *appears* is not this widget's business: `tcoda.widgets.
-        # Footer(pinned=(OPEN_ACTION,))` puts it wherever the app wants it, and
-        # does it properly -- reordering the screen's own map, as this used to,
-        # still left any binding on the focused widget sorting ahead of it.
+        # Where the key *appears* is not this widget's business:
+        # `Footer(pinned=(OPEN_ACTION,))` puts it wherever the app wants it.
+        # Reordering the screen's own binding map from here would not do: any
+        # binding on the focused widget still sorts ahead of the screen's.
         screen.refresh_bindings()
 
     # -------------------------------------------------------------- display

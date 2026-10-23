@@ -4,12 +4,11 @@
 
 """Resize a widget by dragging one of its own borders.
 
-Two apps had grown three copies of this between them -- two of them
-line-for-line identical, one flipped onto the other axis -- always the same
-three handlers and the same `_dragging` flag. There is no separate handle
-widget and no splitter: the border the widget already draws *is* the grab
-area, which is why this is a mixin over any widget rather than a container to
-wrap things in::
+Every resizable pane needs the same three mouse handlers and the same drag
+flag, whichever axis it resizes along. There is no separate handle widget
+and no splitter: the border the widget already draws *is* the grab area, which
+is why this is a mixin over any widget rather than a container to wrap things
+in::
 
     class Sidebar(Resizable, Tree):
         RESIZE_EDGE = "right"

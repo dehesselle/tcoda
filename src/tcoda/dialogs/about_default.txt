@@ -3,7 +3,7 @@
    |   _|  __|  _  |  _  |  _  |
    |____|____|_____|_____|___._|
 
-Shared widgets and dialogs for our Textual apps.
+Widgets, dialogs and helpers for Textual apps.
 
 Pass AboutDialog(path=...) — or AboutMenuItem(path=...) —
 to show your own about-text instead of this placeholder.
