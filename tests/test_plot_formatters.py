@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2025 David Fokkema
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
 #
 # SPDX-License-Identifier: MIT
 
@@ -89,7 +90,7 @@ class TestDurationFormatter:
     def test_unit_selection(
         self, duration_formatter: DurationFormatter, xmin, xmax, expected_unit
     ):
-        ticks, labels = duration_formatter.get_ticks_and_labels(xmin, xmax)
+        _, labels = duration_formatter.get_ticks_and_labels(xmin, xmax)
         # Check that labels contain the expected unit
         assert all(expected_unit in label for label in labels)
 

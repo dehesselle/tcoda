@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2025 David Fokkema
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
 #
 # SPDX-License-Identifier: MIT
 
@@ -13,24 +14,19 @@ interactive features like zooming and panning.
 from __future__ import annotations
 
 import enum
-import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import ceil, floor
 from statistics import mean
-from typing import Sequence, TypeAlias
+from typing import ClassVar, Self
 
-from rich.text import Text
-from textual.binding import Binding
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from rich.text import Text
 from textual import on
 from textual._box_drawing import BOX_CHARACTERS, combine_quads
 from textual.app import ComposeResult, RenderResult
+from textual.binding import Binding, BindingType
 from textual.containers import Grid
 from textual.css.query import NoMatches
 from textual.events import (
@@ -45,19 +41,19 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
-from tcoda.plot._canvas import Canvas, TextAlign
-from tcoda.plot._hires import HiResMode
 
 from tcoda.plot._axis_formatter import (
     AxisFormatter,
     CategoricalAxisFormatter,
     NumericAxisFormatter,
 )
+from tcoda.plot._canvas import Canvas, TextAlign
+from tcoda.plot._hires import HiResMode
 
 __all__ = ["HiResMode", "LegendLocation", "PlotWidget"]
 
-FloatScalar: TypeAlias = float | np.floating
-FloatArray: TypeAlias = NDArray[np.floating]
+type FloatScalar = float | np.floating
+type FloatArray = NDArray[np.floating]
 
 
 LEGEND_LINE = {
@@ -195,13 +191,13 @@ class PlotWidget(Widget, can_focus=True):
             y_max: Maximum value of the y-axis after the change.
         """
 
-        plot: "PlotWidget"
+        plot: PlotWidget
         x_min: float
         x_max: float
         y_min: float
         y_max: float
 
-    COMPONENT_CLASSES = {"plot--axis", "plot--tick", "plot--label"}
+    COMPONENT_CLASSES: ClassVar[set[str]] = {"plot--axis", "plot--tick", "plot--label"}
 
     DEFAULT_CSS = """
         PlotWidget {
@@ -249,7 +245,7 @@ class PlotWidget(Widget, can_focus=True):
 
     ZOOM_GROUP = Binding.Group("Zoom")
     PAN_GROUP = Binding.Group("Pan")
-    BINDINGS = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("+", "zoom_in", "Zoom in", group=ZOOM_GROUP),
         Binding("-", "zoom_out", "Zoom out", group=ZOOM_GROUP),
         Binding(
@@ -1453,8 +1449,8 @@ class PlotWidget(Widget, can_focus=True):
             if widget.id == "margin-bottom":
                 offset = event.screen_offset - self.screen.get_offset(canvas)
             x, y = self.get_coordinate_from_pixel(offset.x, offset.y)
-            zoom_x = True if widget.id in ("plot", "margin-bottom") else False
-            zoom_y = True if widget.id in ("plot", "margin-left") else False
+            zoom_x = widget.id in ("plot", "margin-bottom")
+            zoom_y = widget.id in ("plot", "margin-left")
             self._zoom(x, y, factor, zoom_x, zoom_y)
 
     def _zoom_with_keyboard(
@@ -1762,10 +1758,10 @@ def map_pixel_to_coordinate(
 
 def linear_mapper(
     x: FloatScalar | int,
-    a: float | int,
-    b: float | int,
-    a_prime: float | int,
-    b_prime: float | int,
+    a: float,
+    b: float,
+    a_prime: float,
+    b_prime: float,
 ) -> FloatScalar:
     """Perform linear mapping from range [a, b] to range [a_prime, b_prime].
 

@@ -1,20 +1,14 @@
 # SPDX-FileCopyrightText: 2025 David Fokkema
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
 #
 # SPDX-License-Identifier: MIT
 
 import enum
-import sys
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from math import ceil, floor
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
-from typing import Callable, TypeAlias
+from typing import ClassVar, Self
 
 import numpy as np
 from numpy.typing import NDArray
@@ -29,8 +23,8 @@ from textual.widget import Widget
 
 from tcoda.plot._hires import HiResMode, hires_sizes, pixels
 
-FloatScalar: TypeAlias = float | np.floating
-FloatArray: TypeAlias = NDArray[np.floating]
+type FloatScalar = float | np.floating
+type FloatArray = NDArray[np.floating]
 
 get_box = BOX_CHARACTERS.__getitem__
 
@@ -57,7 +51,7 @@ class Canvas(Widget):
     _styles: list[list[str]]
 
     # Style cache to avoid reparsing identical style strings
-    _style_cache: dict[str, Style] = {}
+    _style_cache: ClassVar[dict[str, Style]] = {}
 
     def __init__(
         self,

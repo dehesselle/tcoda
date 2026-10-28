@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2025 David Fokkema
+# SPDX-FileCopyrightText: 2026 René de Hesselle <dehesselle@web.de>
 #
 # SPDX-License-Identifier: MIT
 
@@ -11,9 +12,10 @@ Different formatters can be used for different types of data (numeric, datetime,
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime, timezone
 from math import ceil, floor, log10
-from typing import Sequence
+from typing import ClassVar
 
 import numpy as np
 
@@ -38,7 +40,6 @@ class AxisFormatter(ABC):
         Returns:
             A list of tick positions (as floats).
         """
-        pass
 
     @abstractmethod
     def get_labels_for_ticks(self, ticks: Sequence[float]) -> list[str]:
@@ -50,7 +51,6 @@ class AxisFormatter(ABC):
         Returns:
             A list of formatted tick labels as strings.
         """
-        pass
 
     def get_ticks_and_labels(
         self, min_: float, max_: float, max_ticks: int = 8
@@ -186,7 +186,7 @@ class DurationFormatter(AxisFormatter):
     """
 
     # Time unit conversions to seconds
-    UNITS = [
+    UNITS: ClassVar[list[tuple[str, float]]] = [
         ("y", 365.25 * 24 * 3600),  # years (accounting for leap years)
         ("mo", 30.44 * 24 * 3600),  # months (average)
         ("d", 24 * 3600),  # days
@@ -293,7 +293,7 @@ class DateTimeFormatter(AxisFormatter):
     """
 
     # Time unit conversions to seconds
-    UNITS = [
+    UNITS: ClassVar[list[tuple[str, float]]] = [
         ("years", 365.25 * 24 * 3600),  # years (accounting for leap years)
         ("months", 30.44 * 24 * 3600),  # months (average)
         ("days", 24 * 3600),  # days
@@ -308,7 +308,7 @@ class DateTimeFormatter(AxisFormatter):
         Args:
             tz: Timezone for displaying datetime values. Defaults to UTC if None.
         """
-        self.tz = tz if tz is not None else timezone.utc
+        self.tz = tz if tz is not None else UTC
 
     def _select_unit(self, min_: float, max_: float) -> tuple[str, float]:
         """Select the most appropriate time unit based on the range.
