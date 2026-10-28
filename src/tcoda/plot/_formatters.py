@@ -33,9 +33,9 @@ def nice_ticks(low: float, high: float, max_ticks: int = 8) -> list[float]:
     As many as fit: the closest such spacing that makes at most `max_ticks`
     intervals.
     """
-    if not (isfinite(low) and isfinite(high)):
-        return []
     delta = high - low
+    if not isfinite(delta):
+        return []
     if delta <= 0:
         return [low]
     max_ticks = max(1, max_ticks)

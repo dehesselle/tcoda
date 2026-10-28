@@ -77,6 +77,65 @@ def pan(range_: Range, delta: float) -> Range:
     return low + delta, high + delta
 
 
+#: The narrowest a range may be, relative to how far it is from zero: much
+#: narrower, and neighbouring cells would map to the same float.
+MIN_RELATIVE_SPAN = 1e-9
+#: How far from zero a range may reach. Further, and mapping it onto cells
+#: overflows a float.
+MAX_MAGNITUDE = 1e300
+
+
+def constrain(
+    new: Range,
+    old: Range,
+    bounds: tuple[float | None, float | None],
+    spans: tuple[float | None, float | None],
+    anchor: float | None = None,
+) -> Range:
+    """Where zooming or panning from `old` to `new` may go.
+
+    The span is kept between the shortest and longest of `spans`, around
+    `anchor` (the point zoomed around), and the range is moved back inside
+    `bounds`, or shrunk to them. Each limit only stops a range from getting
+    worse: one that `old` is already past is relaxed to where `old` is.
+
+    A range too wide or too far out for floats (see `MAX_MAGNITUDE`), or too
+    narrow for them to tell its cells apart, is refused outright: the answer
+    is `old`.
+    """
+    low, high = new
+    old_low, old_high = old
+    width, old_width = high - low, old_high - old_low
+    magnitude = max(abs(low), abs(high))
+    # NaN fails every comparison, so it is refused along with the rest.
+    if not (MIN_RELATIVE_SPAN * magnitude < width and magnitude <= MAX_MAGNITUDE):
+        return old
+
+    shortest, longest = spans
+    target = width
+    if shortest is not None:
+        target = max(target, min(shortest, old_width))
+    if longest is not None:
+        target = min(target, max(longest, old_width))
+    if target != width:
+        centre = (low + high) / 2 if anchor is None else anchor
+        scale = target / width
+        low, high = centre - (centre - low) * scale, centre + (high - centre) * scale
+
+    first, last = bounds
+    if first is not None:
+        first = min(first, old_low)
+    if last is not None:
+        last = max(last, old_high)
+    if first is not None and last is not None and high - low > last - first:
+        return first, last
+    if first is not None and low < first:
+        low, high = first, high + first - low
+    if last is not None and high > last:
+        low, high = low - (high - last), last
+    return low, high
+
+
 def _rescale(value: float, source: Range, target: Range) -> float:
     """Map `value` linearly from the `source` range onto the `target` range."""
     (a, b), (a_target, b_target) = source, target

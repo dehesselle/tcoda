@@ -99,7 +99,7 @@ class MyApp(App[None]):
   dataset that has a `label`.
 - **The legend can be dragged.** Letting go re-anchors it to the corner it is
   nearest, so a resize keeps it where it was put relative to that corner.
-  Dragging it is allowed even with `allow_pan_and_zoom` off, since moving the
+  Dragging it is allowed even with `pan_and_zoom=None`, since moving the
   legend changes nothing about the data shown.
 
 ## Zoom and pan
@@ -109,15 +109,32 @@ class MyApp(App[None]):
   A drag captures the mouse, so it carries on past the edge of the plot.
 - **The keys** are `+`/`-` (zoom), `ctrl+=`/`ctrl+-` for the x axis only,
   `ctrl+shift+=`/`ctrl+shift+-` for the y axis only, the arrow keys (pan)
-  and `r` (reset).
-- **`allow_pan_and_zoom=False` turns off the wheel, dragging and the keys**,
-  and the keys leave the footer (through `check_action`). The wheel then
-  passes through, so a plot inside a scrolling container does not block the
-  scroll. `invert_mouse_wheel=True` flips the wheel.
+  and `r` (reset). Each binding has an id (`plot.zoom_in`, `plot.pan_left`,
+  ..., `plot.reset_range`), so an app's keymap (`App.set_keymap`) can move it
+  to another key. A subclass that wants an action gone altogether returns
+  False for it from `check_action`.
+- **`pan_and_zoom` says which axes the user moves**: `"xy"` (the default),
+  `"x"`, `"y"`, or None for neither. The keys of an axis left out leave the
+  footer and pass through to the app (through `check_action`), so with `"x"`,
+  `up` and `down` still reach whatever is behind the plot. The wheel over an
+  axis left out passes through too, and with None it does everywhere, so a
+  plot inside a scrolling container does not block the scroll.
+  `invert_mouse_wheel=True` flips the wheel.
+- **`x_bounds` and `x_span` keep zooming and panning in check** (and the same
+  for y). `x_bounds=(first, last)` is how far the range may go, and
+  `x_span=(shortest, longest)` how narrow and wide it may get; None leaves an
+  end open. They clamp rather than refuse: panning stops at the wall, zooming out
+  near it moves the range back inside, and zooming stops at the span around
+  the pointer. Limits the app sets may lie beyond them; then they only stop
+  the range from getting worse.
+- **Every plot refuses a range floats cannot draw**: one reaching further
+  than 1e300 from zero, or narrower than a billionth of its distance from
+  zero. Zooming out or in for ever stops there instead of crashing.
 - **Zooming, panning and resetting post `Plot.RangeChanged`**, which carries
   the new `x_range` and `y_range` and has a `control`, so
-  `@on(Plot.RangeChanged, "#id")` works. Assigning `x_limits` posts nothing:
-  the app already knows.
+  `@on(Plot.RangeChanged, "#id")` works. A press that moves nothing, at a
+  bound say, posts nothing. Assigning `x_limits` posts nothing either: the
+  app already knows.
 
 ## Provenance
 

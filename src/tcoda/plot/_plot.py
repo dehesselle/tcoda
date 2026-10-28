@@ -46,7 +46,7 @@ from tcoda.plot._datasets import (
 from tcoda.plot._formatters import AxisFormatter, CategoricalFormatter, NumericFormatter
 from tcoda.plot._hires import HiResMode
 from tcoda.plot._legend import Legend, LegendLocation
-from tcoda.plot._viewport import Range, Viewport, pan, zoom
+from tcoda.plot._viewport import Range, Viewport, constrain, pan, zoom
 
 #: An axis's limits; None leaves that end to follow the data.
 type Limits = tuple[float | None, float | None]
@@ -56,22 +56,24 @@ _LEGEND_LOCATIONS: tuple[LegendLocation, ...] = get_args(LegendLocation.__value_
 
 _ZOOM = Binding.Group("Zoom")
 _PAN = Binding.Group("Pan")
-#: The actions `allow_pan_and_zoom` turns off.
-_VIEW_ACTIONS = frozenset(
-    {
-        "zoom_in",
-        "zoom_out",
-        "zoom_x_in",
-        "zoom_x_out",
-        "zoom_y_in",
-        "zoom_y_out",
-        "pan_left",
-        "pan_right",
-        "pan_up",
-        "pan_down",
-        "reset_range",
-    }
-)
+#: The axes zooming and panning move: both, or just one.
+type Axes = Literal["xy", "x", "y"]
+_AXES: tuple[Axes, ...] = get_args(Axes.__value__)
+
+#: The actions `pan_and_zoom` can turn off, and the axes each moves.
+_VIEW_ACTIONS: dict[str, Axes] = {
+    "zoom_in": "xy",
+    "zoom_out": "xy",
+    "zoom_x_in": "x",
+    "zoom_x_out": "x",
+    "zoom_y_in": "y",
+    "zoom_y_out": "y",
+    "pan_left": "x",
+    "pan_right": "x",
+    "pan_up": "y",
+    "pan_down": "y",
+    "reset_range": "xy",
+}
 
 
 class _XTick(NamedTuple):
@@ -167,17 +169,38 @@ class Plot(Widget, can_focus=True):
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("plus", "zoom_in", "Zoom in", group=_ZOOM),
-        Binding("minus", "zoom_out", "Zoom out", group=_ZOOM),
-        Binding("ctrl+equals_sign", "zoom_x_in", "Zoom x in", show=False),
-        Binding("ctrl+minus", "zoom_x_out", "Zoom x out", show=False),
-        Binding("ctrl+shift+equals_sign", "zoom_y_in", "Zoom y in", show=False),
-        Binding("ctrl+shift+minus", "zoom_y_out", "Zoom y out", show=False),
-        Binding("left", "pan_left", "Pan left", group=_PAN),
-        Binding("right", "pan_right", "Pan right", group=_PAN),
-        Binding("up", "pan_up", "Pan up", group=_PAN),
-        Binding("down", "pan_down", "Pan down", group=_PAN),
-        Binding("r", "reset_range", "Reset"),
+        # Each has an id, so an app's keymap can move it to another key.
+        Binding("plus", "zoom_in", "Zoom in", group=_ZOOM, id="plot.zoom_in"),
+        Binding("minus", "zoom_out", "Zoom out", group=_ZOOM, id="plot.zoom_out"),
+        Binding(
+            "ctrl+equals_sign",
+            "zoom_x_in",
+            "Zoom x in",
+            show=False,
+            id="plot.zoom_x_in",
+        ),
+        Binding(
+            "ctrl+minus", "zoom_x_out", "Zoom x out", show=False, id="plot.zoom_x_out"
+        ),
+        Binding(
+            "ctrl+shift+equals_sign",
+            "zoom_y_in",
+            "Zoom y in",
+            show=False,
+            id="plot.zoom_y_in",
+        ),
+        Binding(
+            "ctrl+shift+minus",
+            "zoom_y_out",
+            "Zoom y out",
+            show=False,
+            id="plot.zoom_y_out",
+        ),
+        Binding("left", "pan_left", "Pan left", group=_PAN, id="plot.pan_left"),
+        Binding("right", "pan_right", "Pan right", group=_PAN, id="plot.pan_right"),
+        Binding("up", "pan_up", "Pan up", group=_PAN, id="plot.pan_up"),
+        Binding("down", "pan_down", "Pan down", group=_PAN, id="plot.pan_down"),
+        Binding("r", "reset_range", "Reset", id="plot.reset_range"),
     ]
 
     #: How much one notch of the wheel zooms.
@@ -217,9 +240,19 @@ class Plot(Widget, can_focus=True):
     y_formatter: var[AxisFormatter] = var(NumericFormatter, init=False)
     #: The corner the legend starts out in, or None for no legend.
     legend: var[LegendLocation | None] = var(None, init=False)
-    #: Whether the mouse and keys zoom and pan. Off, the wheel passes through
-    #: to whatever is behind the plot, and the keys leave the footer.
-    allow_pan_and_zoom: var[bool] = var(True, init=False, bindings=True)
+    #: The axes the mouse and keys zoom and pan, or None for neither. An
+    #: axis left out stays as the limits have it, its keys leave the footer,
+    #: and the wheel over its tick labels passes through to whatever is
+    #: behind the plot (as it does everywhere, with None).
+    pan_and_zoom: var[Axes | None] = var("xy", init=False, bindings=True)
+    #: How far zooming and panning may take each axis: (first, last), None
+    #: leaving that end open.
+    x_bounds: var[Limits] = var((None, None), init=False)
+    y_bounds: var[Limits] = var((None, None), init=False)
+    #: The shortest and longest range zooming may reach on each axis, None
+    #: leaving that end open.
+    x_span: var[Limits] = var((None, None), init=False)
+    y_span: var[Limits] = var((None, None), init=False)
     #: Whether scrolling down zooms out instead of in.
     invert_mouse_wheel: var[bool] = var(False, init=False)
 
@@ -229,7 +262,7 @@ class Plot(Widget, can_focus=True):
         x_label: str = "",
         y_label: str = "",
         legend: LegendLocation | None = None,
-        allow_pan_and_zoom: bool = True,
+        pan_and_zoom: Axes | None = "xy",
         invert_mouse_wheel: bool = False,
         name: str | None = None,
         id: str | None = None,
@@ -241,7 +274,7 @@ class Plot(Widget, can_focus=True):
             x_label: The x axis label.
             y_label: The y axis label.
             legend: The corner the legend starts out in, or None for none.
-            allow_pan_and_zoom: Whether the mouse and keys zoom and pan.
+            pan_and_zoom: The axes the mouse and keys zoom and pan, or None.
             invert_mouse_wheel: Whether scrolling down zooms out.
             name: The widget's name.
             id: DOM id.
@@ -252,7 +285,7 @@ class Plot(Widget, can_focus=True):
         self.set_reactive(Plot.x_label, x_label)
         self.set_reactive(Plot.y_label, y_label)
         self.set_reactive(Plot.legend, self.validate_legend(legend))
-        self.set_reactive(Plot.allow_pan_and_zoom, allow_pan_and_zoom)
+        self.set_reactive(Plot.pan_and_zoom, self.validate_pan_and_zoom(pan_and_zoom))
         self.set_reactive(Plot.invert_mouse_wheel, invert_mouse_wheel)
 
         self._datasets: list[Dataset] = []
@@ -264,8 +297,9 @@ class Plot(Widget, can_focus=True):
         self._redraw_pending = False
         #: Styles resolved against the theme, for the redraw in progress.
         self._styles: dict[str, Style] = {}
-        #: What a left-button drag is moving, while one is.
-        self._drag: Literal["legend", "x", "y", "xy"] | None = None
+        #: What a left-button drag is moving, while one is: the legend, or
+        #: the axes it pans.
+        self._drag: Literal["legend"] | Axes | None = None
         #: Where on screen the drag was last seen; moves are measured from
         #: here rather than taken from `MouseMove.delta`.
         self._drag_from = Offset()
@@ -821,36 +855,67 @@ class Plot(Widget, can_focus=True):
 
     # ---------------------------------------------------------------- view
 
-    def _zoom(
-        self, x: float, y: float, factor: float, axes: Literal["x", "y", "xy"]
-    ) -> None:
-        if "x" in axes:
-            self._x_view = zoom(self.x_range, x, factor)
-        if "y" in axes:
-            self._y_view = zoom(self.y_range, y, factor)
-        self._range_changed()
+    def validate_pan_and_zoom(self, axes: Axes | None) -> Axes | None:
+        if axes is not None and axes not in _AXES:
+            raise ValueError(
+                f"pan_and_zoom must be one of {', '.join(_AXES)} or None, not {axes!r}"
+            )
+        return axes
 
-    def _zoom_centre(self, factor: float, axes: Literal["x", "y", "xy"]) -> None:
+    def _allowed(self, axes: Axes) -> Axes | None:
+        """Those of `axes` that `pan_and_zoom` lets the user move."""
+        allowed = "".join(axis for axis in axes if axis in (self.pan_and_zoom or ""))
+        return allowed or None  # type: ignore[return-value]
+
+    def _zoom(self, x: float, y: float, factor: float, axes: Axes) -> None:
+        before = self.x_range, self.y_range
+        allowed = self._allowed(axes) or ""
+        if "x" in allowed:
+            self._move_x(zoom(before[0], x, factor), before[0], x)
+        if "y" in allowed:
+            self._move_y(zoom(before[1], y, factor), before[1], y)
+        self._range_changed(before)
+
+    def _zoom_centre(self, factor: float, axes: Axes) -> None:
         (x_min, x_max), (y_min, y_max) = self.x_range, self.y_range
         self._zoom((x_min + x_max) / 2, (y_min + y_max) / 2, factor, axes)
 
     def _pan(self, cells_x: float, cells_y: float) -> None:
         """Move the data by this many cells, right and down."""
-        if not (cells_x or cells_y) or (viewport := self._viewport()) is None:
+        if (viewport := self._viewport()) is None:
             return
+        before = self.x_range, self.y_range
+        allowed = self.pan_and_zoom or ""
         across, up = viewport.data_per_cell()
-        if cells_x:
-            self._x_view = pan(self.x_range, -across * cells_x)
-        if cells_y:
-            self._y_view = pan(self.y_range, up * cells_y)
-        self._range_changed()
+        if cells_x and "x" in allowed:
+            self._move_x(pan(before[0], -across * cells_x), before[0])
+        if cells_y and "y" in allowed:
+            self._move_y(pan(before[1], up * cells_y), before[1])
+        self._range_changed(before)
 
-    def _range_changed(self) -> None:
+    def _move_x(self, new: Range, old: Range, anchor: float | None = None) -> None:
+        """Zoom or pan x towards `new`, as far as its bounds and span allow."""
+        new = constrain(new, old, self.x_bounds, self.x_span, anchor)
+        if new != old:
+            self._x_view = new
+
+    def _move_y(self, new: Range, old: Range, anchor: float | None = None) -> None:
+        """Zoom or pan y towards `new`, as far as its bounds and span allow."""
+        new = constrain(new, old, self.y_bounds, self.y_span, anchor)
+        if new != old:
+            self._y_view = new
+
+    def _range_changed(self, before: tuple[Range, Range]) -> None:
+        """Tell the app and redraw, if the range moved at all; at a bound or
+        span limit, it may not have."""
+        if (self.x_range, self.y_range) == before:
+            return
         self.post_message(self.RangeChanged(self, self.x_range, self.y_range))
         self._schedule_redraw()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool:
-        return self.allow_pan_and_zoom or action not in _VIEW_ACTIONS
+        axes = _VIEW_ACTIONS.get(action)
+        return axes is None or self._allowed(axes) is not None
 
     def action_zoom_in(self) -> None:
         self._zoom_centre(self.KEYBOARD_ZOOM_FACTOR, "xy")
@@ -884,8 +949,9 @@ class Plot(Widget, can_focus=True):
 
     def action_reset_range(self) -> None:
         """Go back to `x_limits` and `y_limits`."""
+        before = self.x_range, self.y_range
         self._x_view = self._y_view = None
-        self._range_changed()
+        self._range_changed(before)
 
     # --------------------------------------------------------------- mouse
 
@@ -901,7 +967,7 @@ class Plot(Widget, can_focus=True):
             return None
         return widget
 
-    def _axes_at(self, widget: Widget | None) -> Literal["x", "y", "xy"] | None:
+    def _axes_at(self, widget: Widget | None) -> Axes | None:
         """Which axes the mouse moves over `widget`: both over the data, one
         over its tick labels."""
         if widget is self._canvas or widget is self._legend:
@@ -921,8 +987,8 @@ class Plot(Widget, can_focus=True):
     def _zoom_at_pointer(self, event: events.MouseEvent, factor: float) -> None:
         """Zoom keeping the data under the pointer where it is."""
         if (
-            not self.allow_pan_and_zoom
-            or (axes := self._axes_at(self._part_at(event))) is None
+            (axes := self._axes_at(self._part_at(event))) is None
+            or (axes := self._allowed(axes)) is None
             or (viewport := self._viewport()) is None
         ):
             # Not for the plot: let it bubble, to a scrolling container say.
@@ -942,7 +1008,7 @@ class Plot(Widget, can_focus=True):
             # Moving the legend is not panning, so it is always allowed.
             self._drag = "legend"
             self._legend.add_class("-dragging")
-        elif self.allow_pan_and_zoom and (axes := self._axes_at(part)):
+        elif (axes := self._axes_at(part)) and (axes := self._allowed(axes)):
             self._drag = axes
         else:
             return

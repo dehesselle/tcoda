@@ -14,11 +14,12 @@ from __future__ import annotations
 import math
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from typing import get_args
+from typing import ClassVar, get_args
 
 import pytest
 from textual import events, on
 from textual.app import App, ComposeResult
+from textual.binding import BindingType
 from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widget import Widget
@@ -656,7 +657,7 @@ async def test_without_pan_and_zoom_the_wheel_scrolls_what_is_behind() -> None:
     class Scrolling(App[None]):
         def compose(self) -> ComposeResult:
             with VerticalScroll():
-                yield Plot(allow_pan_and_zoom=False)
+                yield Plot(pan_and_zoom=None)
                 yield Widget(classes="filler")
 
         CSS = "Plot { height: 20; } .filler { height: 100; }"
@@ -679,10 +680,157 @@ async def test_without_pan_and_zoom_the_keys_leave_the_footer() -> None:
         plot.focus()
         await pilot.pause()
         assert plot.check_action("zoom_in", ())
-        plot.allow_pan_and_zoom = False
+        plot.pan_and_zoom = None
         assert not plot.check_action("zoom_in", ())
         await pilot.press("plus")
         assert plot.x_range == (0.0, 1.0)
+
+
+async def test_an_unknown_pan_and_zoom_is_refused() -> None:
+    with pytest.raises(ValueError, match="pan_and_zoom"):
+        Plot(pan_and_zoom="z")  # type: ignore[arg-type]
+
+
+class Keyed(App[None]):
+    """A plot with only x to zoom and pan, and an app that wants ↑ for
+    itself."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [("up", "went_up")]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.went_up = 0
+
+    def compose(self) -> ComposeResult:
+        yield Plot(pan_and_zoom="x")
+
+    def action_went_up(self) -> None:
+        self.went_up += 1
+
+
+async def test_x_alone_zooms_and_pans_x_alone() -> None:
+    app = Keyed()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = plot.y_limits = (0, 10)
+        plot.focus()
+        await pilot.press("plus", "left", "ctrl+shift+equals_sign")
+        await settle(pilot, plot)
+        low, high = plot.x_range
+        assert high - low < 10 and low < 0.75
+        assert plot.y_range == (0.0, 10.0)
+        assert not plot.check_action("pan_up", ())
+        assert not plot.check_action("zoom_y_in", ())
+        assert plot.check_action("zoom_in", ())
+
+
+async def test_a_key_for_an_axis_left_out_reaches_the_app() -> None:
+    app = Keyed()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.y_limits = (0, 10)
+        plot.focus()
+        await pilot.press("up")
+        await settle(pilot, plot)
+        assert app.went_up == 1
+        assert plot.y_range == (0.0, 10.0)
+
+
+async def test_the_wheel_over_an_axis_left_out_scrolls_what_is_behind() -> None:
+    class Scrolling(App[None]):
+        def compose(self) -> ComposeResult:
+            with VerticalScroll():
+                yield Plot(pan_and_zoom="x")
+                yield Widget(classes="filler")
+
+        CSS = "Plot { height: 20; } .filler { height: 100; }"
+
+    app = Scrolling()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        await settle(pilot, plot)
+        scroll = app.query_one(VerticalScroll)
+        scroll_down(plot.query_one("#plot-y-ticks"), 1, 5)
+        await pilot.pause()
+        assert scroll.scroll_y > 0
+        # Over the data, only x zooms.
+        scroll_down(canvas(plot), 10, 5)
+        await pilot.pause()
+        assert plot.x_range != (0.0, 10.0)
+        assert plot._y_view is None
+
+
+async def test_panning_stops_at_a_bound_without_a_message() -> None:
+    seen: list[Plot.RangeChanged] = []
+
+    class Bounded(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Plot()
+
+        def on_plot_range_changed(self, event: Plot.RangeChanged) -> None:
+            seen.append(event)
+
+    app = Bounded()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.x_bounds = (0, None)
+        plot.focus()
+        await pilot.press("left")
+        await settle(pilot, plot)
+        assert plot.x_range == (0.0, 10.0)
+        assert seen == []
+        await pilot.press("right", "left", "left")
+        await settle(pilot, plot)
+        assert plot.x_range == (0.0, 10.0)
+        assert len(seen) == 2
+
+
+async def test_zooming_stops_at_the_span_limits() -> None:
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.x_span = (5, 20)
+        plot.focus()
+        await pilot.press(*["ctrl+equals_sign"] * 10)
+        low, high = plot.x_range
+        assert high - low == pytest.approx(5)
+        await pilot.press(*["ctrl+minus"] * 20)
+        low, high = plot.x_range
+        assert high - low == pytest.approx(20)
+
+
+async def test_zooming_out_for_ever_stays_finite() -> None:
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_formatter = DateTimeFormatter()
+        plot.plot([1.7e9, 1.8e9], [0, 1])
+        await settle(pilot, plot)
+        for _ in range(6000):
+            plot._zoom_centre(-Plot.KEYBOARD_ZOOM_FACTOR, "xy")
+        await settle(pilot, plot)
+        assert all(map(math.isfinite, plot.x_range + plot.y_range))
+        for _ in range(400):
+            plot._zoom_centre(Plot.KEYBOARD_ZOOM_FACTOR, "xy")
+        await settle(pilot, plot)
+        low, high = plot.x_range
+        assert high > low
+
+
+async def test_a_keymap_moves_a_plot_key() -> None:
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        app.set_keymap({"plot.reset_range": "home"})
+        plot.focus()
+        await pilot.press("plus", "r")
+        assert plot.x_range != (0.0, 10.0)
+        await pilot.press("home")
+        assert plot.x_range == (0.0, 10.0)
 
 
 # ------------------------------------------------------------------- theme

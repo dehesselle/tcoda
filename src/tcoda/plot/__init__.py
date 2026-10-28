@@ -29,9 +29,10 @@ from tcoda.plot._formatters import (
 )
 from tcoda.plot._hires import HiResMode
 from tcoda.plot._legend import LegendLocation
-from tcoda.plot._plot import Plot
+from tcoda.plot._plot import Axes, Plot
 
 __all__ = [
+    "Axes",
     "AxisFormatter",
     "CategoricalFormatter",
     "DateTimeFormatter",
