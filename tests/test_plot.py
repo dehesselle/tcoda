@@ -915,6 +915,54 @@ async def test_limits_set_once_settled_move_the_view() -> None:
         assert plot._x_view is None
 
 
+# ----------------------------------------------------------------- helpers
+
+
+async def test_data_size_is_the_area_inside_the_frame() -> None:
+    async with drawn(lambda plot: None) as plot:
+        width, height = canvas(plot).size
+        assert plot.data_size == (width - 2, height - 2)
+
+
+def test_an_unmounted_plot_has_no_data_size() -> None:
+    assert Plot().data_size == (0, 0)
+
+
+async def test_data_at_maps_a_screen_cell_to_data() -> None:
+    def draw(plot: Plot) -> None:
+        plot.x_limits = (0, 10)
+        plot.y_limits = (0, 100)
+
+    async with drawn(draw) as plot:
+        area = canvas(plot).content_region
+        left = plot.data_at(area.offset + (1, area.height - 2))
+        right = plot.data_at(area.offset + (area.width - 2, 1))
+        assert left is not None and right is not None
+        assert left[0] < 0.5 and left[1] < 10
+        assert right[0] > 9.5 and right[1] > 90
+
+
+async def test_data_at_is_none_outside_the_frame() -> None:
+    async with drawn(lambda plot: plot.plot(XS, SINE)) as plot:
+        area = canvas(plot).content_region
+        assert plot.data_at(area.offset) is None
+        assert plot.data_at(area.offset + (-3, 5)) is None
+        assert plot.data_at(area.offset + (5, area.height)) is None
+
+
+async def test_legend_content_is_the_legend_on_one_line() -> None:
+    def draw(plot: Plot) -> None:
+        plot.plot([0, 1], [0, 1], hires_mode="braille", label="sent")
+        plot.scatter([0, 1], [1, 0], style="$error", label="lost")
+        plot.plot([0, 1], [1, 1])
+
+    async with drawn(draw) as plot:
+        content = plot.legend_content()
+        assert content.plain == "⠒⠒⠒ sent  o lost"
+        styles = {span.style for span in content.spans}
+        assert plot._style("$error") in styles
+
+
 # ------------------------------------------------------------------- theme
 
 

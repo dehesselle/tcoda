@@ -101,6 +101,9 @@ class MyApp(App[None]):
   nearest, so a resize keeps it where it was put relative to that corner.
   Dragging it is allowed even with `pan_and_zoom=None`, since moving the
   legend changes nothing about the data shown.
+- **`legend_content()` is the legend on one line**, as `Content` with each
+  marker in its dataset's style: `⠒⠒⠒ sent  ⠒⠒⠒ received`. Put it in a border
+  title, say, where it takes no room from the data.
 
 ## Zoom and pan
 
@@ -144,6 +147,21 @@ class MyApp(App[None]):
   that lands mid-gesture would otherwise snap the view back under the user's
   hands. The new limits are still where `reset_range` goes; assigned after
   `RangeSettled`, they move the view as usual.
+
+## Size and pointer
+
+- **`data_size` is the area inside the frame**, in cells: how many points a
+  line has room for (twice as many across, in braille), or how many buckets
+  are worth fetching. It is `Size(0, 0)` until the plot is laid out.
+- **`data_at(offset)` is the data point under a screen cell**, such as a
+  mouse event's `screen_offset`, or None outside the frame. Hover readouts
+  need nothing more:
+
+  ```python
+  def on_mouse_move(self, event: events.MouseMove) -> None:
+      point = self.query_one(Plot).data_at(event.screen_offset)
+      self.border_subtitle = "" if point is None else f"{point[0]:.1f}"
+  ```
 
 ## Provenance
 

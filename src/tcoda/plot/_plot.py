@@ -26,8 +26,9 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container
+from textual.content import Content
 from textual.errors import NoWidget
-from textual.geometry import Offset, Region
+from textual.geometry import Offset, Region, Size
 from textual.message import Message
 from textual.reactive import var
 from textual.style import Style
@@ -652,6 +653,26 @@ class Plot(Widget, can_focus=True):
             return None
         return Viewport(self.x_range, self.y_range, Region(1, 1, width - 2, height - 2))
 
+    @property
+    def data_size(self) -> Size:
+        """The cells data is drawn in, inside the frame: how many points a
+        line has room for, say. Empty until the plot is laid out."""
+        viewport = self._viewport()
+        return Size(0, 0) if viewport is None else viewport.region.size
+
+    def data_at(self, offset: Offset) -> tuple[float, float] | None:
+        """The data point under a cell of the screen, such as a mouse event's
+        `screen_offset`; None outside the frame.
+
+        The point is the cell's centre, to a cell's precision.
+        """
+        if (viewport := self._viewport()) is None:
+            return None
+        x, y = offset - self._canvas.content_region.offset
+        if not viewport.region.contains(x, y):
+            return None
+        return viewport.to_data(x, y)
+
     # ------------------------------------------------------------- drawing
 
     def _schedule_redraw(self) -> None:
@@ -856,6 +877,19 @@ class Plot(Widget, can_focus=True):
         )
 
     # -------------------------------------------------------------- legend
+
+    def legend_content(self) -> Content:
+        """The legend on one line, each entry's marker in its style, for a
+        border title say. Needs the plot mounted, for the theme's colours."""
+        return Content("  ").join(
+            Content.assemble(
+                (dataset.legend_marker().strip(), self._style(dataset.style)),
+                " ",
+                dataset.label,
+            )
+            for dataset in self._datasets
+            if dataset.label is not None
+        )
 
     def validate_legend(self, location: LegendLocation | None) -> LegendLocation | None:
         if location is not None and location not in _LEGEND_LOCATIONS:
