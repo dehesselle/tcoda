@@ -71,6 +71,7 @@ class MyApp(App[None]):
 - **Ticks fit the plot's size.** y gets one per `Y_TICK_SPACING` rows (3) at
   most. x gets one per `X_TICK_SPACING` columns (8) at most, and fewer where
   their labels would come closer than two cells. Both are class attributes.
+  A label near either end is moved inside the plot rather than cut off.
 - **An end that follows the data goes `AUTO_MARGIN` (5%) past it**, so the
   highest and lowest values are not hidden under the frame. A fixed end goes
   exactly where it was put.

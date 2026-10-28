@@ -83,7 +83,6 @@ class _XTick(NamedTuple):
 
     x: int
     label: str
-    align: Literal["center", "right"]
     #: The first and last column the label covers.
     start: int
     end: int
@@ -783,24 +782,22 @@ class Plot(Widget, can_focus=True):
     ) -> list[_XTick]:
         low, high = viewport.x_range
         categorical = isinstance(self.x_formatter, CategoricalFormatter)
+        # Labels may start as far left as the axis canvas does, under the y
+        # tick labels, but end no further right than the frame.
+        first = self._x_axis_canvas.region.x - self._canvas.region.x
+        last = viewport.region.right
         placed = []
         for tick, label in sorted(zip(ticks, labels)):
             if not low <= tick <= high:
                 continue
             x, _ = viewport.to_cell(tick, 0.0)
-            align: Literal["center", "right"] = "center"
-            # Where `Canvas.write_text` puts the label's first character.
+            if tick == low and not categorical:
+                # The start of the range sits on the frame's corner.
+                x -= 1
+            # Centred on the tick where there is room, else moved inside.
             start = x - (len(label) - 1) // 2
-            if not categorical:
-                # The ends of the range sit on the frame's corners, and a
-                # label at the right end stays inside the plot.
-                if tick == low:
-                    x -= 1
-                    start -= 1
-                elif tick == high:
-                    align = "right"
-                    start = x - len(label) + 1
-            placed.append(_XTick(x, label, align, start, start + len(label) - 1))
+            start = max(first, min(start, last - len(label) + 1))
+            placed.append(_XTick(x, label, start, start + len(label) - 1))
         return placed
 
     def _draw_x_ticks(self, viewport: Viewport) -> None:
@@ -817,7 +814,7 @@ class Plot(Widget, can_focus=True):
                 self._canvas.add_box(tick.x, 0, (2, 0, 0, 0), axis_style)
                 self._canvas.add_box(tick.x, bottom, (0, 0, 2, 0), axis_style)
             self._x_axis_canvas.write_text(
-                tick.x + shift, 0, tick.label, tick_style, tick.align
+                tick.start + shift, 0, tick.label, tick_style
             )
 
     def _y_ticks_in_view(self, viewport: Viewport) -> list[tuple[int, str]]:

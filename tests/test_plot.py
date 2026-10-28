@@ -12,7 +12,7 @@ something is, and everything that isn't a picture.
 from __future__ import annotations
 
 import math
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from typing import ClassVar, get_args
 
@@ -25,7 +25,13 @@ from textual.pilot import Pilot
 from textual.widget import Widget
 from textual.widgets import Static
 
-from tcoda.plot import DateTimeFormatter, HiResMode, LegendLocation, Plot
+from tcoda.plot import (
+    DateTimeFormatter,
+    HiResMode,
+    LegendLocation,
+    NumericFormatter,
+    Plot,
+)
 from tcoda.plot._canvas import Canvas
 
 SIZE = (80, 24)
@@ -305,6 +311,24 @@ async def test_ticks_at_the_ends_leave_the_corners_plain() -> None:
         assert x_labels(plot).split()[::5] == ["0", "10"]
         y_ticks = text_of(plot, "#plot-y-ticks").split()
         assert (y_ticks[0], y_ticks[-1]) == ("10", "0")
+
+
+async def test_a_label_near_either_end_stays_inside_the_plot() -> None:
+    class Named(NumericFormatter):
+        def get_labels(self, ticks: Sequence[float]) -> list[str]:
+            return [f"tick {tick:g} here" for tick in ticks]
+
+    def draw(plot: Plot) -> None:
+        plot.x_limits = (0, 10)
+        plot.x_formatter = Named()
+        plot.x_ticks = [0.1, 9.9]
+
+    async with drawn(draw) as plot:
+        row = x_labels(plot)
+        assert "tick 0.1 here" in row and "tick 9.9 here" in row
+        # The right one ends at the frame, not past it.
+        frame = canvas(plot).region.right - plot.query_one("#plot-x-axis").region.x
+        assert row.rindex("here") + len("here") == frame
 
 
 async def test_x_ticks_thin_out_on_a_narrow_plot() -> None:
