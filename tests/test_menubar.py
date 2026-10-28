@@ -10,9 +10,10 @@ from __future__ import annotations
 import asyncio
 from typing import ClassVar
 
+import pytest
 from textual import events, on
 from textual.app import App, ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingType
 from textual.pilot import Pilot
 from textual.screen import Screen
 from textual.widgets import OptionList, Static
@@ -641,3 +642,73 @@ async def test_key_none_leaves_the_screen_unbound() -> None:
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert "f9" not in app.screen.active_bindings
+
+
+async def test_key_none_still_installs_the_action_for_the_app_to_bind() -> None:
+    class AppBound(App[None]):
+        BINDINGS: ClassVar[list[BindingType]] = [
+            Binding("f10", f"screen.{OPEN_ACTION}", "Menu")
+        ]
+
+        def compose(self) -> ComposeResult:
+            with MenuBar(key=None), Menu("File", id="file"):
+                yield MenuItem("Open...", id="open")
+
+    app = AppBound()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f10")
+        await settle(pilot)
+        assert isinstance(app.screen, MenuBarOverlay)
+
+
+async def test_removing_the_bar_unbinds_its_key() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot)
+        await app.query_one(MenuBar).remove()
+        await pilot.pause()
+        assert "f9" not in app.screen.active_bindings
+        assert not hasattr(app.screen, f"action_{OPEN_ACTION}")
+
+
+async def test_a_replacement_bar_takes_the_key_over() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot)
+        await app.query_one(MenuBar).remove()
+        replacement = MenuBar(id="replacement")
+        await app.screen.mount(replacement)
+        await replacement.mount(Menu("Edit", id="edit"))
+        await pilot.press("f9")
+        await settle(pilot)
+        assert replacement.revealed
+
+
+async def test_a_second_bar_asking_for_a_key_is_refused_at_mount() -> None:
+    class TwoKeyed(App[None]):
+        def compose(self) -> ComposeResult:
+            with MenuBar(), Menu("File", id="file"):
+                yield MenuItem("Open...", id="open")
+            with MenuBar(key="f8"), Menu("Edit", id="edit"):
+                yield MenuItem("Copy", id="copy")
+
+    app = TwoKeyed()
+    with pytest.raises(ValueError, match="already owns"):
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+
+
+async def test_a_second_bar_without_a_key_mounts_and_leaves_the_key_alone() -> None:
+    class SecondKeyless(App[None]):
+        def compose(self) -> ComposeResult:
+            with MenuBar(id="first"), Menu("File", id="file"):
+                yield MenuItem("Open...", id="open")
+            with MenuBar(id="second", key=None), Menu("Edit", id="edit"):
+                yield MenuItem("Copy", id="copy")
+
+    app = SecondKeyless()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        assert app.query_one("#first", MenuBar).revealed
+        assert not app.query_one("#second", MenuBar).revealed

@@ -41,6 +41,8 @@ class MainScreen(Screen):
   The action is called `open_menubar` (exported as `OPEN_ACTION`), so
   something other than the key (a clickable key bar, say) reaches it with
   `run_action("screen.open_menubar")`. Pass `key=None` to bind it yourself.
+  Removing the bar unbinds the key; a second bar on the same screen needs
+  `key=None`.
   Where the key *appears* is not the bar's business: pin it with
   [`Footer(pinned=(OPEN_ACTION,))`](Footer.md). Under a stock `Footer` it lands
   in focus-chain order like anything else.

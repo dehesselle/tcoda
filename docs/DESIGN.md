@@ -69,8 +69,16 @@ one.
 - The action is exported as a constant (`OPEN_ACTION`, `TOGGLE_ACTION`) so
   something other than the key can reach it with `run_action(...)`, and so a
   [`Footer`](widgets/Footer.md) pin keeps working when an app rebinds the key.
-- `key=` changes the key; `key=None` installs nothing, leaving the app to bind
-  it.
+- `key=` changes the key; `key=None` binds none, leaving the app to bind one
+  to the action, which is installed either way.
+- Removing the widget takes the binding and the action away again, so a
+  replacement mounted afterwards owns the key in its place.
+- One widget owns the action per screen: the first one mounted. A second one
+  asking for a key raises at mount, since its key would reach the first one;
+  with `key=None` it mounts quietly and is driven through its own methods.
+  An action per instance would lift that limit, but only by giving up the one
+  fixed name that `Footer(pinned=...)` and `run_action` rely on — a poor
+  trade for a second menu bar nobody has asked for.
 - `show_key=False` keeps the binding out of the footer altogether, but *where*
   it appears is never the widget's business — that is the footer's.
 

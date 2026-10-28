@@ -34,7 +34,9 @@ class MainScreen(Screen):
   way [`MenuBar`](MenuBar.md) does — see
   [DESIGN.md](../DESIGN.md#widgets-that-own-a-key-bind-it-on-their-screen).
   Pass `key=` to change it, or `key=None` to bind it yourself (see
-  `TOGGLE_ACTION`).
+  `TOGGLE_ACTION`). A second `LogViewer` on the same screen needs `key=None`
+  and is toggled through its own `toggle()`; asking for a key raises at
+  mount.
 - **Sources are logger names (`record.name`), discovered live** — the
   checklist grows as new ones appear, defaulting to visible. Hiding a
   source stops new lines from it reaching the panel, but they stay in the

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -29,6 +30,10 @@ from textual.widgets.selection_list import Selection
 from tcoda.log_sink import InMemoryLogHandler, LogEntry
 from tcoda.widgets._layers import install_layer
 from tcoda.widgets._multi_select import MultiSelect
+from tcoda.widgets._screen_keys import install_screen_key, uninstall_screen_key
+
+if TYPE_CHECKING:
+    from textual.screen import Screen
 
 #: The action `LogViewer` installs on its screen -- see `OPEN_ACTION` in
 #: `tcoda.widgets._menubar` for the identical pattern this mirrors.
@@ -129,6 +134,7 @@ class LogViewer(Widget, can_focus=False):
         self._key_description = key_description
         self._show_key = show_key
 
+        self._key_screen: Screen[Any]  # set at mount
         self._handler: InMemoryLogHandler  # set in _attach_handler, at mount
         self._owns_handler = False
         self._min_level: int = logging.INFO
@@ -159,8 +165,16 @@ class LogViewer(Widget, can_focus=False):
 
     def on_mount(self) -> None:
         install_layer(self.screen, _LAYER)
-        if self._key is not None:
-            self._install_binding()
+        # On the screen rather than on the panel, which is never focused --
+        # see `tcoda.widgets._screen_keys`.
+        self._key_screen = install_screen_key(
+            self,
+            TOGGLE_ACTION,
+            self.toggle,
+            self._key,
+            self._key_description,
+            show=self._show_key,
+        )
         self._attach_handler()
         sources = self.query_one("#log-viewer-sources", MultiSelect)
         for entry in self._handler.entries():
@@ -178,36 +192,10 @@ class LogViewer(Widget, can_focus=False):
         self._handler.subscribe(self._on_sink_entry)
 
     def on_unmount(self) -> None:
+        uninstall_screen_key(self._key_screen, self, TOGGLE_ACTION)
         self._handler.unsubscribe(self._on_sink_entry)
         if self._owns_handler:
             self._logger.removeHandler(self._handler)
-
-    def _install_binding(self) -> None:
-        # A key binding cannot live on this widget: Textual only consults
-        # the focus chain plus the screen and the app. So it installs
-        # itself onto whichever screen it was mounted on, mirroring
-        # MenuBar.on_mount (src/tcoda/widgets/_menubar.py).
-        screen = self.screen
-        if not hasattr(screen, f"action_{TOGGLE_ACTION}"):
-            setattr(screen, f"action_{TOGGLE_ACTION}", self.toggle)
-        bindings = screen._bindings
-        if any(
-            binding.action == TOGGLE_ACTION
-            for binding in bindings.key_to_bindings.get(self._key, ())
-        ):
-            # Already installed: on_mount runs again if the panel is
-            # remounted, and a second binding would put a duplicate in the
-            # footer.
-            return
-        bindings.bind(
-            self._key,
-            TOGGLE_ACTION,
-            self._key_description,
-            show=self._show_key,
-        )
-        # Ordering is the app's call, via `Footer(pinned=(TOGGLE_ACTION,))` --
-        # see MenuBar.on_mount.
-        screen.refresh_bindings()
 
     def _attach_handler(self) -> None:
         if self._explicit_handler is not None:

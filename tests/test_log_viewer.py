@@ -20,7 +20,7 @@ from textual.pilot import Pilot
 from textual.widgets import RichLog, Select, Static
 
 from tcoda.log_sink import InMemoryLogHandler
-from tcoda.widgets import LogViewer
+from tcoda.widgets import TOGGLE_ACTION, LogViewer
 from tcoda.widgets._log_viewer import _LAYER
 from tcoda.widgets._multi_select import MultiSelect, MultiSelectOverlay
 
@@ -477,6 +477,54 @@ async def test_toggle_key_none_installs_no_binding(logger_name: str) -> None:
         assert "f1" not in app.screen.active_bindings
 
 
+async def test_toggle_key_none_still_installs_the_action(logger_name: str) -> None:
+    app = Harness(logger=logger_name, key=None)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await app.run_action(f"screen.{TOGGLE_ACTION}")
+        await settle(pilot)
+        assert app.query_one(LogViewer).revealed is True
+
+
+async def test_removing_the_panel_unbinds_its_key(logger_name: str) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await app.query_one(LogViewer).remove()
+        await pilot.pause()
+        assert "f1" not in app.screen.active_bindings
+        assert not hasattr(app.screen, f"action_{TOGGLE_ACTION}")
+
+
+async def test_a_second_panel_asking_for_a_key_is_refused_at_mount(
+    logger_name: str,
+) -> None:
+    class TwoKeyed(App[None]):
+        def compose(self) -> ComposeResult:
+            yield LogViewer(logger=f"{logger_name}.a")
+            yield LogViewer(logger=f"{logger_name}.b", key="f2")
+
+    app = TwoKeyed()
+    with pytest.raises(ValueError, match="already owns"):
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+
+
+async def test_a_second_panel_without_a_key_leaves_the_key_to_the_first(
+    logger_name: str,
+) -> None:
+    class SecondKeyless(App[None]):
+        def compose(self) -> ComposeResult:
+            yield LogViewer(logger=f"{logger_name}.a", id="first")
+            yield LogViewer(logger=f"{logger_name}.b", id="second", key=None)
+
+    app = SecondKeyless()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f1")
+        await settle(pilot)
+        assert app.query_one("#first", LogViewer).revealed is True
+        assert app.query_one("#second", LogViewer).revealed is False
+
+
 # ------------------------------------------------------------- focus chain
 
 
@@ -623,7 +671,8 @@ async def test_two_log_viewers_do_not_double_register_the_layer(
     class TwoViewers(App[None]):
         def compose(self) -> ComposeResult:
             yield LogViewer(logger=logger_name, id="first")
-            yield LogViewer(logger=logger_name + "-second", id="second")
+            # A second viewer cannot also own the key -- see the key tests.
+            yield LogViewer(logger=logger_name + "-second", id="second", key=None)
             yield Static("body", id="body")
 
     app = TwoViewers()

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+from typing import TYPE_CHECKING, Any
 
 from textual import work
 from textual.reactive import reactive
@@ -22,6 +23,10 @@ from textual.widgets import Static
 
 from tcoda.widgets._dropdown import MenuBarOverlay, MenuDropdown, OpenNeighbor
 from tcoda.widgets._menuitem import Menu, MenuItem
+from tcoda.widgets._screen_keys import install_screen_key, uninstall_screen_key
+
+if TYPE_CHECKING:
+    from textual.screen import Screen
 
 #: The action `MenuBar` installs on its screen, and therefore the name to use
 #: when something other than the key binding wants to open the bar --
@@ -85,6 +90,7 @@ class MenuBar(Widget, can_focus=False):
         self._show_key = show_key
         self.set_reactive(MenuBar.auto_hide, auto_hide)
         self.set_reactive(MenuBar.revealed, not auto_hide)
+        self._key_screen: Screen[Any]  # set at mount
 
     # No compose(): children arrive through the `with MenuBar():` protocol,
     # and Textual mounts those *before* anything compose() yields. Extending
@@ -108,35 +114,20 @@ class MenuBar(Widget, can_focus=False):
 
     def on_mount(self) -> None:
         self._sync_display()
-        if self._key is None:
-            return
-        # A key binding cannot live on this widget: Textual only consults the
-        # focus chain plus the screen and the app, and the bar is never
-        # focused. So it installs itself onto whichever screen it was mounted
-        # on -- which is also why this works whether the bar sits on the app's
-        # default screen or on one that was pushed.
-        screen = self.screen
-        if not hasattr(screen, f"action_{OPEN_ACTION}"):
-            setattr(screen, f"action_{OPEN_ACTION}", self.open)
-        bindings = screen._bindings
-        if any(
-            binding.action == OPEN_ACTION
-            for binding in bindings.key_to_bindings.get(self._key, ())
-        ):
-            # Already installed: on_mount runs again if the bar is remounted,
-            # and a second binding would put a duplicate in the footer.
-            return
-        bindings.bind(
-            self._key,
+        # On the screen rather than on the bar, which is never focused -- see
+        # `tcoda.widgets._screen_keys`. That is also why this works whether
+        # the bar sits on the app's default screen or on one that was pushed.
+        self._key_screen = install_screen_key(
+            self,
             OPEN_ACTION,
+            self.open,
+            self._key,
             self._key_description,
             show=self._show_key,
         )
-        # Where the key *appears* is not this widget's business:
-        # `Footer(pinned=(OPEN_ACTION,))` puts it wherever the app wants it.
-        # Reordering the screen's own binding map from here would not do: any
-        # binding on the focused widget still sorts ahead of the screen's.
-        screen.refresh_bindings()
+
+    def on_unmount(self) -> None:
+        uninstall_screen_key(self._key_screen, self, OPEN_ACTION)
 
     # -------------------------------------------------------------- display
 
