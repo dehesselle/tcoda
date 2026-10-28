@@ -5,8 +5,8 @@
 """The plot widget, end to end: each kind of dataset reaches the canvas.
 
 Upstream's own tests cover the axis formatters and the coordinate maths; these
-cover the drawing, so that reworking its internals (numpy first) shows up as a
-failure here rather than as a blank plot.
+cover the drawing, so that reworking its internals shows up as a failure here
+rather than as a blank plot.
 """
 
 from __future__ import annotations

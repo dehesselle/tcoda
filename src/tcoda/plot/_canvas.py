@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from math import ceil, floor
 from typing import ClassVar, Self
 
-import numpy as np
-from numpy.typing import NDArray
 from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
@@ -22,9 +20,6 @@ from textual.strip import Strip
 from textual.widget import Widget
 
 from tcoda.plot._hires import HiResMode, hires_sizes, pixels
-
-type FloatScalar = float | np.floating
-type FloatArray = NDArray[np.floating]
 
 get_box = BOX_CHARACTERS.__getitem__
 
@@ -303,7 +298,7 @@ class Canvas(Widget):
 
     def set_hires_pixels(
         self,
-        coordinates: Iterable[tuple[FloatScalar, FloatScalar]],
+        coordinates: Iterable[tuple[float, float]],
         hires_mode: HiResMode | None = None,
         style: str = "white",
     ) -> None:
@@ -353,15 +348,15 @@ class Canvas(Widget):
 
         # Process each cell that needs updating
         for (cell_x, cell_y), points in cells_to_update.items():
-            # Create a small buffer just for this cell
-            cell_buffer = np.zeros((pixel_size.height, pixel_size.width), dtype=bool)
+            # A small buffer just for this cell, row by row
+            cell_buffer = [0] * (w_factor * h_factor)
 
             # Mark each point in the buffer
             for offset_x, offset_y in points:
-                cell_buffer[offset_y, offset_x] = True
+                cell_buffer[offset_y * w_factor + offset_x] = 1
 
-            # Convert to subpixels and look up the character
-            subpixels = tuple(int(v) for v in cell_buffer.flat)
+            # Look up the character for this pattern of subpixels
+            subpixels = tuple(cell_buffer)
             if char := pixel_info[subpixels]:
                 self.set_pixel(
                     cell_x,
@@ -465,9 +460,7 @@ class Canvas(Widget):
 
     def draw_hires_lines(
         self,
-        coordinates: Iterable[
-            tuple[FloatScalar, FloatScalar, FloatScalar, FloatScalar]
-        ],
+        coordinates: Iterable[tuple[float, float, float, float]],
         hires_mode: HiResMode | None = None,
         style: str = "white",
     ) -> None:

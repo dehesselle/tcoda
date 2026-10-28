@@ -12,12 +12,51 @@ Different formatters can be used for different types of data (numeric, datetime,
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from bisect import bisect_left
 from collections.abc import Sequence
 from datetime import UTC, datetime, timezone
 from math import ceil, floor, log10
 from typing import ClassVar
 
-import numpy as np
+NICE_INTERVALS = [1.0, 2.0, 5.0, 10.0]
+
+
+def nice_ticks(min_: float, max_: float, max_ticks: int = 8) -> list[float]:
+    """Generate tick values at nice intervals (1, 2, 5, 10, etc.).
+
+    Args:
+        min_: Minimum value of the range.
+        max_: Maximum value of the range.
+        max_ticks: Maximum number of ticks to generate. Defaults to 8.
+
+    Returns:
+        A list of tick values.
+    """
+    delta = max_ - min_
+    tick_spacing = delta / 5
+    power = floor(log10(tick_spacing)) if tick_spacing > 0 else 0
+    approx_interval = tick_spacing / 10**power
+
+    idx = bisect_left(NICE_INTERVALS, approx_interval)
+    interval = (NICE_INTERVALS[idx - 1] if idx > 0 else NICE_INTERVALS[0]) * 10**power
+    if delta // interval > max_ticks:
+        interval = NICE_INTERVALS[idx] * 10**power
+    return arange(ceil(min_ / interval) * interval, max_ + interval / 2, interval)
+
+
+def arange(start: float, stop: float, step: float) -> list[float]:
+    """Generate evenly spaced values in the half-open interval [start, stop).
+
+    Args:
+        start: First value.
+        stop: End of the interval (exclusive).
+        step: Spacing between values.
+
+    Returns:
+        A list of values.
+    """
+    count = max(0, ceil((stop - start) / step))
+    return [start + i * step for i in range(count)]
 
 
 class AxisFormatter(ABC):
@@ -93,23 +132,7 @@ class NumericAxisFormatter(AxisFormatter):
         Returns:
             A list of tick values.
         """
-        delta_x = max_ - min_
-        tick_spacing = delta_x / 5
-        power = floor(log10(tick_spacing))
-        approx_interval = tick_spacing / 10**power
-        intervals = np.array([1.0, 2.0, 5.0, 10.0])
-
-        idx = intervals.searchsorted(approx_interval)
-        interval = (intervals[idx - 1] if idx > 0 else intervals[0]) * 10**power
-        if delta_x // interval > max_ticks:
-            interval = intervals[idx] * 10**power
-        ticks = [
-            float(t)
-            for t in np.arange(
-                ceil(min_ / interval) * interval, max_ + interval / 2, interval
-            )
-        ]
-        return ticks
+        return nice_ticks(min_, max_, max_ticks)
 
     def get_labels_for_ticks(self, ticks: Sequence[float]) -> list[str]:
         """Generate formatted labels for given tick values.
@@ -227,27 +250,9 @@ class DurationFormatter(AxisFormatter):
         # Select appropriate unit
         _, unit_value = self._select_unit(min_, max_)
 
-        # Convert to the selected unit
-        min_unit = min_ / unit_value
-        max_unit = max_ / unit_value
-
-        # Calculate nice intervals in the selected unit
-        delta = max_unit - min_unit
-        tick_spacing = delta / 5
-        power = floor(log10(tick_spacing)) if tick_spacing > 0 else 0
-        approx_interval = tick_spacing / 10**power
-        intervals = np.array([1.0, 2.0, 5.0, 10.0])
-
-        idx = intervals.searchsorted(approx_interval)
-        interval = (intervals[idx - 1] if idx > 0 else intervals[0]) * 10**power
-        if delta // interval > max_ticks:
-            interval = intervals[idx] * 10**power
-
-        # Generate ticks in the selected unit, then convert back to seconds
-        ticks_in_unit = np.arange(
-            ceil(min_unit / interval) * interval, max_unit + interval / 2, interval
-        )
-        ticks = [float(t * unit_value) for t in ticks_in_unit]
+        # Generate nice ticks in the selected unit, then convert back to seconds
+        ticks_in_unit = nice_ticks(min_ / unit_value, max_ / unit_value, max_ticks)
+        ticks = [t * unit_value for t in ticks_in_unit]
         return ticks
 
     def get_labels_for_ticks(self, ticks: Sequence[float]) -> list[str]:
@@ -375,27 +380,9 @@ class DateTimeFormatter(AxisFormatter):
         # Select appropriate unit
         unit_name, unit_value = self._select_unit(min_, max_)
 
-        # Convert to the selected unit
-        min_unit = min_ / unit_value
-        max_unit = max_ / unit_value
-
-        # Calculate nice intervals in the selected unit
-        delta = max_unit - min_unit
-        tick_spacing = delta / 5
-        power = floor(log10(tick_spacing)) if tick_spacing > 0 else 0
-        approx_interval = tick_spacing / 10**power
-        intervals = np.array([1.0, 2.0, 5.0, 10.0])
-
-        idx = intervals.searchsorted(approx_interval)
-        interval = (intervals[idx - 1] if idx > 0 else intervals[0]) * 10**power
-        if delta // interval > max_ticks:
-            interval = intervals[idx] * 10**power
-
-        # Generate ticks in the selected unit, then convert back to seconds
-        ticks_in_unit = np.arange(
-            ceil(min_unit / interval) * interval, max_unit + interval / 2, interval
-        )
-        ticks_raw = [float(t * unit_value) for t in ticks_in_unit]
+        # Generate nice ticks in the selected unit, then convert back to seconds
+        ticks_in_unit = nice_ticks(min_ / unit_value, max_ / unit_value, max_ticks)
+        ticks_raw = [t * unit_value for t in ticks_in_unit]
 
         # Round each tick to appropriate datetime boundary
         ticks = [self._round_to_unit(t, unit_name) for t in ticks_raw]

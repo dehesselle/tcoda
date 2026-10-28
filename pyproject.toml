@@ -11,12 +11,7 @@ license = "0BSD AND MIT"
 license-files = ["LICENSE", "LICENSES/*"]
 authors = [{ name = "René de Hesselle", email = "dehesselle@web.de" }]
 requires-python = ">=3.12"
-dependencies = [
-    # Temporary: tcoda.plot brought numpy along and is to be freed of it.
-    "numpy>=2.2.1",
-    "platformdirs>=4.11.0",
-    "textual>=8.2.8,<9",
-]
+dependencies = ["platformdirs>=4.11.0", "textual>=8.2.8,<9"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

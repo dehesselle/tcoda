@@ -22,9 +22,10 @@ class MyApp(App[None]):
 ```
 
 - **Datasets**: `plot`, `scatter`, `bar`, `errorbar` and `add_v_line` each add
-  one; `clear` removes them all. `bar` also takes a list of strings for `x`,
-  which labels the bars by category. NaNs and infinities are dropped before
-  drawing.
+  one; `clear` removes them all. Data is any iterable of numbers — lists,
+  tuples, generators, and NumPy arrays too, though tcoda does not depend on
+  NumPy. `bar` also takes a list of strings for `x`, which labels the bars by
+  category. NaNs and infinities are dropped before drawing.
 - **Axes**: `set_xlimits`/`set_ylimits` (pass `None` for either end to
   auto-scale it), `set_xlabel`/`set_ylabel`, `set_xticks`/`set_yticks` (`None`
   for automatic, `[]` for none), and `set_x_formatter`/`set_y_formatter` with an

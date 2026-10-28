@@ -14,14 +14,14 @@ interactive features like zooming and panning.
 from __future__ import annotations
 
 import enum
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from math import ceil, floor
+from itertools import pairwise
+from math import ceil, floor, isfinite
+from numbers import Real
 from statistics import mean
 from typing import ClassVar, Self
 
-import numpy as np
-from numpy.typing import ArrayLike, NDArray
 from rich.text import Text
 from textual import on
 from textual._box_drawing import BOX_CHARACTERS, combine_quads
@@ -51,9 +51,6 @@ from tcoda.plot._canvas import Canvas, TextAlign
 from tcoda.plot._hires import HiResMode
 
 __all__ = ["HiResMode", "LegendLocation", "PlotWidget"]
-
-type FloatScalar = float | np.floating
-type FloatArray = NDArray[np.floating]
 
 
 LEGEND_LINE = {
@@ -89,8 +86,8 @@ class DataSet:
         hires_mode: High-resolution rendering mode or None for standard rendering.
     """
 
-    x: FloatArray
-    y: FloatArray
+    x: list[float]
+    y: list[float]
     hires_mode: HiResMode | None
 
 
@@ -127,8 +124,8 @@ class ErrorBarPlot(ScatterPlot):
         yerr: Array of y-direction error values (can be None for no y errors).
     """
 
-    xerr: FloatArray
-    yerr: FloatArray
+    xerr: list[float]
+    yerr: list[float]
 
 
 @dataclass
@@ -140,7 +137,7 @@ class BarPlot(DataSet):
         bar_style: Rich style string or array of styles for the bars (e.g., "white", "bold red").
     """
 
-    width: FloatArray
+    width: list[float]
     bar_style: str | list[str]
 
 
@@ -400,8 +397,8 @@ class PlotWidget(Widget, can_focus=True):
 
     def plot(
         self,
-        x: ArrayLike,
-        y: ArrayLike,
+        x: Iterable[float],
+        y: Iterable[float],
         line_style: str = "white",
         hires_mode: HiResMode | None = None,
         label: str | None = None,
@@ -413,15 +410,15 @@ class PlotWidget(Widget, can_focus=True):
         characters.
 
         Args:
-            x: An ArrayLike with the data values for the horizontal axis.
-            y: An ArrayLike with the data values for the vertical axis.
+            x: An iterable with the data values for the horizontal axis.
+            y: An iterable with the data values for the vertical axis.
             line_style: A string with the style of the line. Defaults to
                 "white".
             hires_mode: A HiResMode enum or None to plot with full-height
                 blocks. Defaults to None.
             label: A string with the label for the dataset. Defaults to None.
         """
-        x, y = drop_nans_and_infs(np.array(x), np.array(y))
+        x, y = drop_nans_and_infs(x, y)
         self._datasets.append(
             LinePlot(
                 x=x,
@@ -436,8 +433,8 @@ class PlotWidget(Widget, can_focus=True):
 
     def scatter(
         self,
-        x: ArrayLike,
-        y: ArrayLike,
+        x: Iterable[float],
+        y: Iterable[float],
         marker: str = "o",
         marker_style: str = "white",
         hires_mode: HiResMode | None = None,
@@ -450,8 +447,8 @@ class PlotWidget(Widget, can_focus=True):
         characters.
 
         Args:
-            x: An ArrayLike with the data values for the horizontal axis.
-            y: An ArrayLike with the data values for the vertical axis.
+            x: An iterable with the data values for the horizontal axis.
+            y: An iterable with the data values for the vertical axis.
             marker: A string with the character to print as the marker.
             marker_style: A string with the style of the marker. Defaults to
                 "white".
@@ -459,7 +456,7 @@ class PlotWidget(Widget, can_focus=True):
                 marker. Defaults to None.
             label: A string with the label for the dataset. Defaults to None.
         """
-        x, y = drop_nans_and_infs(np.array(x), np.array(y))
+        x, y = drop_nans_and_infs(x, y)
         self._datasets.append(
             ScatterPlot(
                 x=x,
@@ -475,10 +472,10 @@ class PlotWidget(Widget, can_focus=True):
 
     def errorbar(
         self,
-        x: ArrayLike,
-        y: ArrayLike,
-        xerr: ArrayLike | None = None,
-        yerr: ArrayLike | None = None,
+        x: Iterable[float],
+        y: Iterable[float],
+        xerr: Iterable[float] | None = None,
+        yerr: Iterable[float] | None = None,
         marker: str = "",
         marker_style: str = "white",
         hires_mode: HiResMode | None = None,
@@ -496,11 +493,11 @@ class PlotWidget(Widget, can_focus=True):
         characters.
 
         Args:
-            x: An ArrayLike with the data values for the horizontal axis.
-            y: An ArrayLike with the data values for the vertical axis.
-            xerr: An ArrayLike with the error values for the horizontal axis,
+            x: An iterable with the data values for the horizontal axis.
+            y: An iterable with the data values for the vertical axis.
+            xerr: An iterable with the error values for the horizontal axis,
                 or None for no x errors. Defaults to None.
-            yerr: An ArrayLike with the error values for the vertical axis,
+            yerr: An iterable with the error values for the vertical axis,
                 or None for no y errors. Defaults to None.
             marker: A string with the character to print as the marker.
             marker_style: A string with the style of the marker. Defaults to
@@ -509,18 +506,18 @@ class PlotWidget(Widget, can_focus=True):
                 marker. Defaults to None.
             label: A string with the label for the dataset. Defaults to None.
         """
-        x, y = drop_nans_and_infs(np.array(x), np.array(y))
+        x, y = drop_nans_and_infs(x, y)
 
-        # Convert error arrays to numpy arrays if provided
-        xerr_array = np.array(xerr) if xerr is not None else np.zeros(shape=x.shape)
-        yerr_array = np.array(yerr) if yerr is not None else np.zeros(shape=y.shape)
+        # Convert error values to lists of floats if provided
+        xerr_list = [float(v) for v in xerr] if xerr is not None else [0.0] * len(x)
+        yerr_list = [float(v) for v in yerr] if yerr is not None else [0.0] * len(y)
 
         self._datasets.append(
             ErrorBarPlot(
                 x=x,
                 y=y,
-                xerr=xerr_array,
-                yerr=yerr_array,
+                xerr=xerr_list,
+                yerr=yerr_list,
                 marker=marker,
                 marker_style=marker_style,
                 hires_mode=hires_mode,
@@ -532,9 +529,9 @@ class PlotWidget(Widget, can_focus=True):
 
     def bar(
         self,
-        x: ArrayLike | list[str],
-        y: ArrayLike,
-        width: float | ArrayLike | None = None,
+        x: Iterable[float] | list[str],
+        y: Iterable[float],
+        width: float | Iterable[float] | None = None,
         bar_style: str | list[str] = "white",
         hires_mode: HiResMode | None = None,
         label: str | None = None,
@@ -547,9 +544,9 @@ class PlotWidget(Widget, can_focus=True):
         characters.
 
         Args:
-            x: An ArrayLike with the x-coordinate values for the center of each bar,
+            x: An iterable with the x-coordinate values for the center of each bar,
                 or a list of strings for categorical data.
-            y: An ArrayLike with the height values for each bar.
+            y: An iterable with the height values for each bar.
             width: Width of the bars in data coordinates. Can be a single value
                 for all bars, an array of widths for each bar, or None to auto-calculate
                 based on spacing. Defaults to None.
@@ -561,36 +558,35 @@ class PlotWidget(Widget, can_focus=True):
         """
         if isinstance(x, list) and x and isinstance(x[0], str):
             categories = list(x)
-            x_values = np.arange(1, len(categories) + 1)
+            category_x = [float(i) for i in range(1, len(categories) + 1)]
             self.set_x_formatter(CategoricalAxisFormatter(categories))
-            self.set_xticks(x_values.tolist())
+            self.set_xticks(category_x)
+            x_values, y_values = drop_nans_and_infs(category_x, y)
         else:
-            x_values = np.array(x)
-
-        x_values, y_values = drop_nans_and_infs(x_values, np.array(y))
+            x_values, y_values = drop_nans_and_infs(x, y)  # type: ignore[arg-type]
 
         # Calculate default width if not provided
         if width is None:
             if len(x_values) > 1:
                 # Use 80% of the minimum spacing between bars
-                spacings = np.diff(np.sort(x_values))
-                width = 0.8 * float(np.min(spacings))
+                sorted_x = sorted(x_values)
+                width = 0.8 * min(b - a for a, b in pairwise(sorted_x))
             else:
                 # Single bar, use a reasonable default
                 width = 0.8
 
-        # Convert width to array if it's a scalar
-        width_array: FloatArray
-        if isinstance(width, (int, float, np.number)):
-            width_array = np.full_like(x_values, width, dtype=float)
+        # Convert width to list if it's a scalar
+        width_list: list[float]
+        if isinstance(width, (int, float, Real)):
+            width_list = [float(width)] * len(x_values)
         else:
-            width_array = np.array(width, dtype=float)
+            width_list = [float(w) for w in width]
 
         self._datasets.append(
             BarPlot(
                 x=x_values,
                 y=y_values,
-                width=width_array,
+                width=width_list,
                 bar_style=bar_style,
                 hires_mode=hires_mode,
             )
@@ -928,36 +924,36 @@ class PlotWidget(Widget, can_focus=True):
             for dataset in self._datasets:
                 if isinstance(dataset, BarPlot):
                     # For bar plots, include the left and right edges
-                    x_left = dataset.x - dataset.width / 2
-                    x_right = dataset.x + dataset.width / 2
+                    x_left = [x - w / 2 for x, w in zip(dataset.x, dataset.width)]
+                    x_right = [x + w / 2 for x, w in zip(dataset.x, dataset.width)]
                     xs.append(x_left)
                     xs.append(x_right)
                     # Include both y=0 and the bar heights
-                    ys.append(np.zeros_like(dataset.y))
+                    ys.append([0.0] * len(dataset.y))
                     ys.append(dataset.y)
                 else:
                     xs.append(dataset.x)
                     ys.append(dataset.y)
 
             if self._v_lines:
-                xs.append(np.array([vline.x for vline in self._v_lines]))
+                xs.append([vline.x for vline in self._v_lines])
 
             if self._auto_x_min:
                 non_empty_xs = [x for x in xs if len(x) > 0]
                 if non_empty_xs:
-                    self._x_min = float(np.min([np.min(x) for x in non_empty_xs]))
+                    self._x_min = float(min(min(x) for x in non_empty_xs))
             if self._auto_x_max:
                 non_empty_xs = [x for x in xs if len(x) > 0]
                 if non_empty_xs:
-                    self._x_max = float(np.max([np.max(x) for x in non_empty_xs]))
+                    self._x_max = float(max(max(x) for x in non_empty_xs))
             if self._auto_y_min:
                 non_empty_ys = [y for y in ys if len(y) > 0]
                 if non_empty_ys:
-                    self._y_min = float(np.min([np.min(y) for y in non_empty_ys]))
+                    self._y_min = float(min(min(y) for y in non_empty_ys))
             if self._auto_y_max:
                 non_empty_ys = [y for y in ys if len(y) > 0]
                 if non_empty_ys:
-                    self._y_max = float(np.max([np.max(y) for y in non_empty_ys]))
+                    self._y_max = float(max(max(y) for y in non_empty_ys))
 
             if self._x_min == self._x_max:
                 self._x_min -= 1e-6
@@ -1035,7 +1031,7 @@ class PlotWidget(Widget, can_focus=True):
             dataset: The error bar plot dataset to render.
         """
 
-        def partial_lengths(length: FloatScalar) -> tuple[float, int, float]:
+        def partial_lengths(length: float) -> tuple[float, int, float]:
             """Return partial lengths of error bar.
 
             An error bar with length 3 should be rendered as: +, --, (extra half
@@ -1061,7 +1057,7 @@ class PlotWidget(Widget, can_focus=True):
             center_px, center_py = self.get_pixel_from_coordinate(xi, yi)
             x0, y0 = self.get_hires_pixel_from_coordinate(0, 0)
 
-            if np.isfinite(xerr):
+            if isfinite(xerr):
                 xe, _ = self.get_hires_pixel_from_coordinate(xerr, 0)
                 x_length = xe - x0
                 center_width, int_width, frac_width = partial_lengths(x_length)
@@ -1093,7 +1089,7 @@ class PlotWidget(Widget, can_focus=True):
             else:
                 center_width = 0.0
 
-            if np.isfinite(yerr):
+            if isfinite(yerr):
                 # determine length of error bars
                 _, ye = self.get_hires_pixel_from_coordinate(0.0, yerr)
                 y_length = y0 - ye
@@ -1363,9 +1359,7 @@ class PlotWidget(Widget, can_focus=True):
         new_quad = combine_quads(current_quad, quad)
         return BOX_CHARACTERS[new_quad]
 
-    def get_pixel_from_coordinate(
-        self, x: FloatScalar, y: FloatScalar
-    ) -> tuple[int, int]:
+    def get_pixel_from_coordinate(self, x: float, y: float) -> tuple[int, int]:
         """Convert data coordinates to canvas pixel coordinates.
 
         Args:
@@ -1386,8 +1380,8 @@ class PlotWidget(Widget, can_focus=True):
         )
 
     def get_hires_pixel_from_coordinate(
-        self, x: FloatScalar, y: FloatScalar
-    ) -> tuple[FloatScalar, FloatScalar]:
+        self, x: float, y: float
+    ) -> tuple[float, float]:
         """Convert data coordinates to high-resolution pixel coordinates.
 
         Args:
@@ -1667,8 +1661,8 @@ class PlotWidget(Widget, can_focus=True):
 
 
 def map_coordinate_to_pixel(
-    x: FloatScalar,
-    y: FloatScalar,
+    x: float,
+    y: float,
     xmin: float,
     xmax: float,
     ymin: float,
@@ -1696,14 +1690,14 @@ def map_coordinate_to_pixel(
 
 
 def map_coordinate_to_hires_pixel(
-    x: FloatScalar,
-    y: FloatScalar,
+    x: float,
+    y: float,
     xmin: float,
     xmax: float,
     ymin: float,
     ymax: float,
     region: Region,
-) -> tuple[FloatScalar, FloatScalar]:
+) -> tuple[float, float]:
     """Map data coordinates to floating-point high-resolution pixel coordinates.
 
     Args:
@@ -1757,12 +1751,12 @@ def map_pixel_to_coordinate(
 
 
 def linear_mapper(
-    x: FloatScalar | int,
+    x: float,
     a: float,
     b: float,
     a_prime: float,
     b_prime: float,
-) -> FloatScalar:
+) -> float:
     """Perform linear mapping from range [a, b] to range [a_prime, b_prime].
 
     Args:
@@ -1778,15 +1772,25 @@ def linear_mapper(
     return a_prime + (x - a) * (b_prime - a_prime) / (b - a)
 
 
-def drop_nans_and_infs(x: FloatArray, y: FloatArray) -> tuple[FloatArray, FloatArray]:
-    """Drop NaNs and Infs from x and y arrays.
+def drop_nans_and_infs(
+    x: Iterable[float], y: Iterable[float]
+) -> tuple[list[float], list[float]]:
+    """Drop NaNs and Infs from x and y values.
 
     Args:
-        x: An array with the data values for the horizontal axis.
-        y: An array with the data values for the vertical axis.
+        x: An iterable with the data values for the horizontal axis.
+        y: An iterable with the data values for the vertical axis.
 
     Returns:
-        A tuple of arrays with NaNs and Infs removed.
+        A tuple of lists of floats with NaNs and Infs removed.
+
+    Raises:
+        ValueError: If x and y have different lengths.
     """
-    mask = ~np.isnan(x) & ~np.isnan(y) & ~np.isinf(x) & ~np.isinf(y)
-    return x[mask], y[mask]
+    x_list: list[float] = []
+    y_list: list[float] = []
+    for xi, yi in zip(x, y, strict=True):
+        if isfinite(xi) and isfinite(yi):
+            x_list.append(float(xi))
+            y_list.append(float(yi))
+    return x_list, y_list
