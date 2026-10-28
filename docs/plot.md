@@ -63,6 +63,11 @@ class MyApp(App[None]):
   `tz`, and it never raises, whatever the range: there are no ticks before
   year 1 or after 9999. So plot real timestamps, not times shifted by the
   zone's offset.
+- **`NumericFormatter` writes very large and very small numbers
+  scientifically** (`1.5e20`, `2e-9`) once a label written out in full would
+  be longer than `MAX_PLAIN_WIDTH` (8, a class attribute), and only if that
+  is shorter. So zooming far out or in never grows the label column without
+  end.
 - **Ticks fit the plot's size.** y gets one per `Y_TICK_SPACING` rows (3) at
   most. x gets one per `X_TICK_SPACING` columns (8) at most, and fewer where
   their labels would come closer than two cells. Both are class attributes.

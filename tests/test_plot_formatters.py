@@ -158,6 +158,35 @@ class TestDurationFormatter:
         assert isinstance(duration_formatter, AxisFormatter)
 
 
+class TestScientificLabels:
+    @pytest.mark.parametrize(
+        "low, high, expected",
+        [
+            (0, 1e20, ["0", "2e19", "4e19", "6e19", "8e19", "1e20"]),
+            (1e20, 1.2e20, ["1e20", "1.05e20", "1.1e20", "1.15e20", "1.2e20"]),
+            (0, 1e-8, ["0", "2e-9", "4e-9", "6e-9", "8e-9", "1e-8"]),
+            (-1e300, 1e300, ["-1e300", "-5e299", "0", "5e299", "1e300"]),
+        ],
+    )
+    def test_long_labels_turn_scientific(self, low, high, expected):
+        assert NumericFormatter().get_ticks_and_labels(low, high)[1] == expected
+
+    def test_labels_that_fit_stay_plain(self):
+        _, labels = NumericFormatter().get_ticks_and_labels(0, 1e7)
+        assert labels[-1] == "10000000"
+
+    def test_plain_stays_when_scientific_is_no_shorter(self):
+        # Far from zero but close together: 1.000000002e9 says no less.
+        _, labels = NumericFormatter().get_ticks_and_labels(1e9, 1e9 + 10)
+        assert labels[1] == "1000000002"
+
+    def test_the_width_is_a_class_attribute(self):
+        class Narrow(NumericFormatter):
+            MAX_PLAIN_WIDTH = 3
+
+        assert Narrow().get_ticks_and_labels(0, 1e4)[1][-1] == "1e4"
+
+
 class TestNumericFormatterEdges:
     def test_descending_ticks_are_labelled(self):
         assert NumericFormatter().get_labels([1.0, 0.5, 0.0]) == ["1.0", "0.5", "0.0"]

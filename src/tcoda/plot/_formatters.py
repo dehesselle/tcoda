@@ -63,6 +63,27 @@ def decimals_for(ticks: Sequence[float]) -> int:
     return max(0, -floor(log10(spacing)))
 
 
+def scientific_labels(ticks: Sequence[float]) -> list[str]:
+    """Ticks in scientific notation, short as can be (``1.5e20``, no ``+``
+    and no leading zeros), with as many digits as tell neighbours apart."""
+    magnitude = max((abs(tick) for tick in ticks), default=0.0)
+    if magnitude == 0 or not isfinite(magnitude):
+        return [f"{tick:g}" for tick in ticks]
+    spacing = min((abs(b - a) for a, b in pairwise(ticks) if a != b), default=0.0)
+    digits = max(0, floor(log10(magnitude)) - floor(log10(spacing))) if spacing else 0
+    labels = []
+    for tick in ticks:
+        if tick == 0:
+            labels.append("0")
+            continue
+        mantissa, exponent = f"{tick:.{digits}e}".split("e")
+        if "." in mantissa:
+            # 2e19 among 1.5e20s: a whole mantissa needs no decimals.
+            mantissa = mantissa.rstrip("0").rstrip(".")
+        labels.append(f"{mantissa}e{int(exponent)}")
+    return labels
+
+
 class AxisFormatter(ABC):
     """Chooses an axis's ticks and labels them.
 
@@ -100,15 +121,25 @@ class NumericFormatter(AxisFormatter):
     """Plain numbers, at nice intervals (1, 2, 5, 10, 20, ...).
 
     Labels get as many decimals as the spacing between the first two ticks
-    needs.
+    needs. Where that makes one longer than `MAX_PLAIN_WIDTH`, very large or
+    very small numbers, they are written in scientific notation instead
+    (``1.5e20``, ``2e-9``), if that is any shorter.
     """
+
+    #: The longest a label written out in full may be.
+    MAX_PLAIN_WIDTH: ClassVar[int] = 8
 
     def get_ticks(self, low: float, high: float, max_ticks: int = 8) -> list[float]:
         return nice_ticks(low, high, max_ticks)
 
     def get_labels(self, ticks: Sequence[float]) -> list[str]:
         decimals = decimals_for(ticks)
-        return [f"{tick:.{decimals}f}" for tick in ticks]
+        labels = [f"{tick:.{decimals}f}" for tick in ticks]
+        width = max(map(len, labels), default=0)
+        if width <= self.MAX_PLAIN_WIDTH:
+            return labels
+        scientific = scientific_labels(ticks)
+        return scientific if max(map(len, scientific)) < width else labels
 
 
 class CategoricalFormatter(AxisFormatter):
