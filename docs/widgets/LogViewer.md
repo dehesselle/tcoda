@@ -23,6 +23,9 @@ class MainScreen(Screen):
   only replays and subscribes, on the assumption the caller manages
   attachment themselves. `handler=` and `logger=` together raise
   `ValueError`.
+- **The level is the `min_level` reactive**, which the dropdown and the
+  code share: `LogViewer(min_level=logging.DEBUG)` starts lower, and setting
+  it later moves the dropdown. It must be one of the dropdown's levels.
 - **The owned logger's level tracks the level dropdown**, not a fixed
   `DEBUG` — a logger left at `DEBUG` costs measurably more than one at its
   default (every `debug`/`info` call across the whole logger hierarchy

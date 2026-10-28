@@ -87,6 +87,10 @@ class LogViewer(Widget, can_focus=False):
     """
 
     revealed: reactive[bool] = reactive(False)
+    #: Entries below this `logging` level are left out of the panel. One of
+    #: the levels the dropdown offers; the dropdown follows it, and it
+    #: follows the dropdown.
+    min_level: reactive[int] = reactive(logging.INFO, init=False)
 
     class _NewEntry(Message):
         """Internal: an entry reached the buffer, possibly from another
@@ -106,6 +110,7 @@ class LogViewer(Widget, can_focus=False):
         key: str | None = "f1",
         key_description: str = "Log",
         show_key: bool = True,
+        min_level: int = logging.INFO,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -126,6 +131,7 @@ class LogViewer(Widget, can_focus=False):
                 yourself (see `TOGGLE_ACTION`).
             key_description: How that key is described in the footer.
             show_key: Whether that key appears in the footer at all.
+            min_level: See the `min_level` reactive.
             name: The widget's name.
             id: DOM id.
             classes: CSS classes.
@@ -139,11 +145,12 @@ class LogViewer(Widget, can_focus=False):
         self._key = key
         self._key_description = key_description
         self._show_key = show_key
+        # set_reactive deliberately bypasses validators, so validate here too.
+        self.set_reactive(LogViewer.min_level, self.validate_min_level(min_level))
 
         self._key_screen: Screen[Any]  # set at mount
         self._handler: InMemoryLogHandler  # set in _attach_handler, at mount
         self._owns_handler = False
-        self._min_level: int = logging.INFO
         self._hidden_sources: set[str] = set()
         self._known_sources: dict[str, None] = {}  # insertion-ordered set
 
@@ -152,7 +159,7 @@ class LogViewer(Widget, can_focus=False):
             yield Select[int](
                 _LEVELS,
                 id="log-viewer-level",
-                value=self._min_level,
+                value=self.min_level,
                 allow_blank=False,
                 compact=True,
             )
@@ -232,14 +239,13 @@ class LogViewer(Widget, can_focus=False):
         # whether the panel is even revealed. Lowering the threshold later
         # cannot recover entries already suppressed before that point.
         if self._owns_handler:
-            self._logger.setLevel(self._min_level)
+            self._logger.setLevel(self.min_level)
 
     # ------------------------------------------------------------------ filter
 
     def _passes(self, entry: LogEntry) -> bool:
         return (
-            entry.levelno >= self._min_level
-            and entry.source not in self._hidden_sources
+            entry.levelno >= self.min_level and entry.source not in self._hidden_sources
         )
 
     @staticmethod
@@ -268,7 +274,22 @@ class LogViewer(Widget, can_focus=False):
             return
         event.stop()
         assert isinstance(event.value, int)
-        self._min_level = event.value
+        self.min_level = event.value
+
+    def validate_min_level(self, level: int) -> int:
+        # The dropdown can only show a level it offers, and a `Select` given
+        # any other value raises -- better here, where the caller is.
+        if level not in dict(_LEVELS).values():
+            raise ValueError(
+                f"min_level must be one of the dropdown's levels, not {level!r}"
+            )
+        return level
+
+    def watch_min_level(self, level: int) -> None:
+        if not self.is_mounted:
+            # Before mount, compose and on_mount pick the level up anyway.
+            return
+        self.query_one("#log-viewer-level", Select).value = level
         self._sync_logger_level()
         self._render_log()
 

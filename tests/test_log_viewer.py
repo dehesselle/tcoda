@@ -157,6 +157,49 @@ async def test_selecting_a_level_re_renders_to_that_minimum(logger_name: str) ->
         assert "info-line" not in _log_text(app)
 
 
+async def test_min_level_can_start_below_info(logger_name: str) -> None:
+    app = Harness(logger=logger_name, min_level=logging.DEBUG)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        logger = logging.getLogger(logger_name)
+        assert logger.level == logging.DEBUG
+        assert app.query_one("#log-viewer-level", Select).value == logging.DEBUG
+        logger.debug("debug-line")
+        await settle(pilot)
+        assert "debug-line" in _log_text(app)
+
+
+async def test_setting_min_level_moves_the_dropdown_and_the_logger(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        logger = logging.getLogger(logger_name)
+        logger.warning("warning-line")
+        await settle(pilot)
+
+        app.query_one(LogViewer).min_level = logging.ERROR
+        await settle(pilot)
+        assert app.query_one("#log-viewer-level", Select).value == logging.ERROR
+        assert logger.level == logging.ERROR
+        assert "warning-line" not in _log_text(app)
+
+
+async def test_the_dropdown_moves_min_level(logger_name: str) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        app.query_one("#log-viewer-level", Select).value = logging.WARNING
+        await settle(pilot)
+        assert app.query_one(LogViewer).min_level == logging.WARNING
+
+
+def test_min_level_must_be_one_the_dropdown_offers() -> None:
+    with pytest.raises(ValueError, match="min_level"):
+        LogViewer(min_level=15)
+
+
 async def test_level_and_above_semantics_are_inclusive(logger_name: str) -> None:
     app = Harness(logger=logger_name)
     async with app.run_test(size=(80, 24)) as pilot:
