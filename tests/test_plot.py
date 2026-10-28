@@ -219,7 +219,7 @@ async def test_a_datetime_axis_labels_dates() -> None:
         plot.plot([1.7e9, 1.7e9 + 3 * 86400], [0, 1])
 
     async with drawn(draw) as plot:
-        assert "2023" in x_labels(plot)
+        assert x_labels(plot).split()[:3] == ["Nov", "15", "12:00"]
 
 
 async def test_descending_custom_ticks_draw() -> None:

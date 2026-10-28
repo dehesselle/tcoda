@@ -48,9 +48,17 @@ class MyApp(App[None]):
 - **Labels are plain text, never markup**, so `"Voltage [mV]"` reads as written.
 - **Formatters** choose ticks and label them: `NumericFormatter` (the
   default), `DurationFormatter` for seconds in a fitting unit (`0.5h`,
-  `1.0h`, ...), `DateTimeFormatter` for Unix timestamps on calendar
-  boundaries, and `CategoricalFormatter`. Subclass `AxisFormatter` for
-  anything else; only `get_ticks` and `get_labels` need writing.
+  `1.0h`, ...), `DateTimeFormatter` for Unix timestamps, and
+  `CategoricalFormatter`. Subclass `AxisFormatter` for anything else; only
+  `get_ticks` and `get_labels` need writing.
+- **`DateTimeFormatter` puts ticks where a clock or calendar would**: every
+  15 minutes, on the hour, every 3 or 6 hours, at midnight, on Mondays, on the
+  first of the month or quarter, on round years. Its labels say only what
+  changes: `21:00`, then `Nov 15` at midnight, then `03:00`. The first tick
+  also carries the date (or the year). It shows local time unless given a
+  `tz`, and it never raises, whatever the range: there are no ticks before
+  year 1 or after 9999. So plot real timestamps, not times shifted by the
+  zone's offset.
 
 ## Look
 
