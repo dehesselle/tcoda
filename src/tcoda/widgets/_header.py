@@ -110,16 +110,22 @@ class Header(Widget, can_focus=False):
         left: str = "",
         right: str = "",
         show_title: bool = True,
+        name: str | None = None,
         id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
     ) -> None:
         """
         Args:
             left: Initial text of the left area.
             right: Initial text of the right area.
             show_title: See the `show_title` reactive.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self._left = left
         self._right = right
         self.set_reactive(Header.show_title, show_title)

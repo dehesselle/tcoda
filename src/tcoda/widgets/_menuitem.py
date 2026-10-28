@@ -96,6 +96,8 @@ class MenuItem(Widget):
         shortcut: str | None = None,
         disabled: bool = False,
         action: MenuAction | None = None,
+        name: str | None = None,
+        classes: str | None = None,
     ) -> None:
         """
         Args:
@@ -116,8 +118,10 @@ class MenuItem(Widget):
                 wherever bindings live.
             disabled: See the `disabled` reactive.
             action: Optionally run this as well as posting `Pressed`.
+            name: The widget's name.
+            classes: CSS classes.
         """
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes)
         self.label = label
         self.mnemonic = mnemonic
         self.shortcut = shortcut
@@ -194,15 +198,26 @@ class Menu(Static):
             self.menu = menu
             super().__init__()
 
-    def __init__(self, title: str, *, id: str | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        *,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
         """
         Args:
             title: The text shown in the bar. Its first letter is the
                 mnemonic that selects this menu from the bar-only stage.
+            name: The widget's name.
             id: DOM id, used to open this menu by name. Also a CSS id --
                 see the warning on `MenuItem`.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(title, id=id)
+        super().__init__(title, name=name, id=id, classes=classes, disabled=disabled)
         self.title_text = title
 
     @property

@@ -53,13 +53,24 @@ class Countdown(Static):
     remaining: reactive[int] = reactive(0, layout=True)
     refreshing: reactive[bool] = reactive(False, layout=True)
 
-    def __init__(self, *, remaining: int = 0, id: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        remaining: int = 0,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
         """
         Args:
             remaining: Initial seconds remaining.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.set_reactive(Countdown.remaining, remaining)
         self._frame = 0
         self._spinner: Timer | None = None

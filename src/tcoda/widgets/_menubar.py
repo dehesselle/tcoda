@@ -70,7 +70,10 @@ class MenuBar(Widget, can_focus=False):
         key: str | None = "f9",
         key_description: str = "Menu",
         show_key: bool = True,
+        name: str | None = None,
         id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
     ) -> None:
         """
         Args:
@@ -81,9 +84,12 @@ class MenuBar(Widget, can_focus=False):
                 (see `OPEN_ACTION`).
             key_description: How that key is described in the footer.
             show_key: Whether that key appears in the footer at all.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self._trailing = trailing
         self._key = key
         self._key_description = key_description

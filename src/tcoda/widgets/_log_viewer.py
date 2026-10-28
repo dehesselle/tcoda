@@ -106,7 +106,10 @@ class LogViewer(Widget, can_focus=False):
         key: str | None = "f1",
         key_description: str = "Log",
         show_key: bool = True,
+        name: str | None = None,
         id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
     ) -> None:
         """
         Args:
@@ -123,11 +126,14 @@ class LogViewer(Widget, can_focus=False):
                 yourself (see `TOGGLE_ACTION`).
             key_description: How that key is described in the footer.
             show_key: Whether that key appears in the footer at all.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
         if handler is not None and logger is not None:
             raise ValueError("pass either handler= or logger=, not both")
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self._explicit_handler = handler
         self._logger_arg = logger
         self._key = key

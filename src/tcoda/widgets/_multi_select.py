@@ -238,9 +238,12 @@ class MultiSelect[SelectionType](Vertical, can_focus=True):
         *,
         label: str = "",
         compact: bool = False,
+        name: str | None = None,
         id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
     ) -> None:
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self._label = label
         self._initial_selections = list(selections)
         self.compact = compact

@@ -377,7 +377,10 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
         pinned: str | Sequence[str] = (),
         sort: bool | SortKey = False,
         compact: bool = False,
+        name: str | None = None,
         id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
     ) -> None:
         """
         Args:
@@ -394,9 +397,14 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
                 is a sort key over `FooterEntry`. Pins are never sorted --
                 `pinned` already states their order.
             compact: Less whitespace per key.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(*children, id=id)
+        super().__init__(
+            *children, name=name, id=id, classes=classes, disabled=disabled
+        )
         self._pin_cache: dict[str, FooterEntry] = {}
         self._rendered: (
             tuple[tuple[FooterEntry, ...], tuple[FooterEntry, ...]] | None

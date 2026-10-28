@@ -98,8 +98,20 @@ class SettingsDialog(Dialog[None]):
     #: the same highlight the menu bar gives a mnemonic.
     INSTANCE_STYLE: ClassVar[str | None] = None
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        """
+        Args:
+            name: The screen's name.
+            id: DOM id.
+            classes: CSS classes.
+        """
+        super().__init__(name=name, id=id, classes=classes)
         self._current_node: TreeNode[str] | None = None
         self._current_group: str | None = None
         #: {setting.key: config.get(setting)} as of when the current group's

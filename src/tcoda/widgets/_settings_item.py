@@ -24,9 +24,19 @@ class SettingsMenuItem(MenuItem):
         id: str = "settings",
         mnemonic: str | None = "s",
         shortcut: str | None = None,
+        disabled: bool = False,
+        name: str | None = None,
+        classes: str | None = None,
     ) -> None:
         super().__init__(
-            label, id=id, mnemonic=mnemonic, shortcut=shortcut, action=self._open
+            label,
+            id=id,
+            mnemonic=mnemonic,
+            shortcut=shortcut,
+            disabled=disabled,
+            action=self._open,
+            name=name,
+            classes=classes,
         )
 
     async def _open(self) -> None:

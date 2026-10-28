@@ -235,14 +235,25 @@ class ChordViewer(Widget, can_focus=False, can_focus_children=False):
     }
     """
 
-    def __init__(self, *, delay: float = 0.2, id: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        delay: float = 0.2,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
         """
         Args:
             delay: Seconds into a chord before the panel appears, if it is
                 still pending by then. 0.2 is which-key's default.
+            name: The widget's name.
             id: DOM id.
+            classes: CSS classes.
+            disabled: Whether the widget starts out disabled.
         """
-        super().__init__(id=id)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.delay = delay
         self.display = False
         self._delay_timer: Timer | None = None

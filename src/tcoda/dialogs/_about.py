@@ -50,6 +50,9 @@ class AboutDialog(Dialog[None]):
         path: str | Path | None = None,
         *,
         variables: dict[str, str] | None = None,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
     ) -> None:
         """
         Args:
@@ -59,8 +62,11 @@ class AboutDialog(Dialog[None]):
                 the about-text with, e.g. an app name or version number.
                 Omit to show the text as-is. A placeholder with no matching
                 key is left in the output untouched.
+            name: The screen's name.
+            id: DOM id.
+            classes: CSS classes.
         """
-        super().__init__()
+        super().__init__(name=name, id=id, classes=classes)
         self._path = Path(path) if path is not None else None
         self._variables = variables
 

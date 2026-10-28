@@ -28,9 +28,19 @@ class AboutMenuItem(MenuItem):
         shortcut: str | None = None,
         path: str | Path | None = None,
         variables: dict[str, str] | None = None,
+        disabled: bool = False,
+        name: str | None = None,
+        classes: str | None = None,
     ) -> None:
         super().__init__(
-            label, id=id, mnemonic=mnemonic, shortcut=shortcut, action=self._open
+            label,
+            id=id,
+            mnemonic=mnemonic,
+            shortcut=shortcut,
+            disabled=disabled,
+            action=self._open,
+            name=name,
+            classes=classes,
         )
         self._path = path
         self._variables = variables

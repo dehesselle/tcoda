@@ -44,6 +44,9 @@ class ConfirmDialog(Dialog[bool]):
         cancel_label: str = "No",
         danger: bool = False,
         focus_cancel: bool = False,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
     ) -> None:
         """
         Args:
@@ -54,8 +57,11 @@ class ConfirmDialog(Dialog[bool]):
             danger: Style the confirm button as destructive.
             focus_cancel: Focus the cancel button instead of the confirm one,
                 so a stray Enter cannot go through with something costly.
+            name: The screen's name.
+            id: DOM id.
+            classes: CSS classes.
         """
-        super().__init__()
+        super().__init__(name=name, id=id, classes=classes)
         self._message = message
         self._title = title
         self._confirm_label = confirm_label
