@@ -114,8 +114,9 @@ every boundary that comes with that:
   gains a copyright line but keeps its license.
 - **Provenance**: the commit that brought the code in changed only headers
   and import paths, so the history shows exactly what tcoda made of it.
-- **Dependencies**: nothing outside `tcoda.plot` imports it, so whatever it
-  needs stays out of `tcoda.widgets` and the rest.
+- **Dependencies**: no library module outside `tcoda.plot` imports it, so
+  whatever it needs stays out of `tcoda.widgets` and the rest. The demo may,
+  being an app like any other consumer.
 
 ## Persisted state is an optimisation, never a dependency
 

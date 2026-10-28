@@ -23,6 +23,7 @@ natural place. All of it is ordinary consumer code, so
 | [Terminal title](terminal_title.md) | The terminal's window or tab title reads "tcoda demo" while the demo runs, and goes back to what it was on exit. |
 | [ConfirmDialog](dialogs/ConfirmDialog.md) | Dialogs → Confirm, and Delete files (the `danger=True, focus_cancel=True` variant, which deletes nothing). |
 | [Dialog](dialogs/Dialog.md) | Dialogs → Filter (F2): `FilterDialog`, the demo's own dialog on the shared chrome. |
+| [Plot](plot.md) | Dialogs → Sizes chart (`ctrl+k d p`): the browsed directory's KiB per extension. Categorical bars in the theme's first colour and a `$warning` mean line, with a legend you can drag. Wheel and drag zoom and pan; `r` resets. |
 | [AboutDialog](dialogs/AboutDialog.md) | Help → About: the demo's own about-text, with `$version` filled in through `variables=`. |
 | [SettingsDialog](dialogs/SettingsDialog.md) and [settings](settings.md) | File → Settings. The dotted `Demo.Refresh` and `Demo.Table` groups include a `choices=` setting and a `SettingAction`. Changes apply when the dialog closes. |
 

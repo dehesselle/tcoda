@@ -1,47 +1,98 @@
 # Plot
 
-A plotting widget: line, scatter, bar and error-bar plots with auto-scaling
-axes, "nice" ticks (1, 2, 5, 10, 20, ...), a legend, and zooming and panning
-by mouse and keyboard. Datasets can be drawn with full cells or with one of
-three high-resolution modes, which pack 1×2, 2×2 or 2×4 pixels into a cell.
+A plotting widget: line, scatter, bar and error-bar plots with axes that scale
+themselves, "nice" ticks (1, 2, 5, 10, 20, ...), a legend, and zooming and
+panning by mouse and keyboard. A dataset is drawn either with full cells or in
+one of three high-resolution modes, which pack 1×2, 2×2 or 2×4 dots into a
+cell.
 
 ```python
-from tcoda.plot import HiResMode, LegendLocation, PlotWidget
+from tcoda.plot import Plot
 
 
 class MyApp(App[None]):
     def compose(self) -> ComposeResult:
-        yield PlotWidget()
-
-    def on_mount(self) -> None:
-        plot = self.query_one(PlotWidget)
-        plot.plot(xs, ys, hires_mode=HiResMode.BRAILLE, label="signal")
-        plot.scatter(xs, noise, marker_style="red", label="noise")
-        plot.set_xlabel("time (s)")
-        plot.show_legend(LegendLocation.TOPRIGHT)
+        plot = Plot(x_label="time (s)", legend="top-right")
+        plot.plot(xs, ys, hires_mode="braille", label="signal")
+        plot.scatter(xs, noise, style="$error", label="noise")
+        yield plot
 ```
 
-- **Datasets**: `plot`, `scatter`, `bar`, `errorbar` and `add_v_line` each add
-  one; `clear` removes them all. Data is any iterable of numbers — lists,
-  tuples, generators, and NumPy arrays too, though tcoda does not depend on
-  NumPy. `bar` also takes a list of strings for `x`, which labels the bars by
-  category. NaNs and infinities are dropped before drawing.
-- **Axes**: `set_xlimits`/`set_ylimits` (pass `None` for either end to
-  auto-scale it), `set_xlabel`/`set_ylabel`, `set_xticks`/`set_yticks` (`None`
-  for automatic, `[]` for none), and `set_x_formatter`/`set_y_formatter` with an
-  `AxisFormatter` — `NumericAxisFormatter` is the default, `DurationFormatter`
-  labels seconds in a fitting unit (`0.5h`, `1.0h`, ...). A date-and-time
-  formatter exists as well,
-  but has not been made public yet (upstream did not export it either).
-- **Zoom and pan**: the scroll wheel zooms around the pointer, dragging pans.
-  The keys are `+`/`-` (zoom), `ctrl+=`/`ctrl+-` for the x axis only,
-  `ctrl+shift+=`/`ctrl+shift+-` for the y axis only, the arrow keys (pan) and
-  `r` (reset). `allow_pan_and_zoom=False` turns off the mouse side only — the
-  keys keep working — and `invert_mouse_wheel=True` flips the wheel. Zooming, panning and resetting
-  post `PlotWidget.ScaleChanged`.
-- **Styling**: the component classes `plot--axis`, `plot--tick` and
-  `plot--label`, and the reactives `margin_top`, `margin_bottom` and
-  `margin_left` for the space taken by ticks and labels.
+## Data
+
+- **`plot`, `scatter`, `errorbar`, `bar` and `vline` each add one dataset;
+  `clear` removes them all.** Datasets are drawn in the order they were added,
+  later ones on top. Data is any iterable of numbers, including NumPy arrays,
+  though tcoda does not depend on NumPy. NaNs and infinities are dropped before
+  drawing, along with anything that belongs to the same point: its error, its
+  bar's width or style.
+- **A plot takes data whenever it is handed it**, before or after it is
+  mounted. Drawing is a function of the plot's state alone, and any change
+  schedules one redraw, however many changes come before it runs.
+- **`bar` takes names instead of numbers for `x`.** The bars go at 1, 2, 3, ...
+  and the axis is labelled with the names, by setting `x_formatter` to a
+  `CategoricalFormatter` and `x_ticks` to those positions. Those are ordinary
+  reactives, so you can see and undo what it did.
+- **`hires_mode` is `"halfblock"`, `"quadrant"`, `"braille"` or None** for full
+  cells. A scatter or error-bar dataset in a high-resolution mode lights a
+  single dot per point instead of drawing its `marker`.
+
+## Axes
+
+- **Everything about an axis is a reactive**: `x_label`, `x_limits`,
+  `x_ticks` and `x_formatter`, and the same for y. Assigning one redraws.
+- **`x_limits` is `(low, high)`, with None for an end that follows the data.**
+  It is what the axis shows until the user zooms or pans. `x_range` is what it
+  shows now, and `reset_range` (`r`) goes back to the limits.
+- **`x_ticks` set to None lets the formatter choose, and `[]` shows none.**
+- **Labels are plain text, never markup**, so `"Voltage [mV]"` reads as written.
+- **Formatters** choose ticks and label them: `NumericFormatter` (the
+  default), `DurationFormatter` for seconds in a fitting unit (`0.5h`,
+  `1.0h`, ...), `DateTimeFormatter` for Unix timestamps on calendar
+  boundaries, and `CategoricalFormatter`. Subclass `AxisFormatter` for
+  anything else; only `get_ticks` and `get_labels` need writing.
+
+## Look
+
+- **Unstyled datasets take the theme's colours in turn**: `$primary`,
+  `$secondary`, `$accent`, `$success`, `$warning`, `$error`, from
+  `Plot.PALETTE`, a class attribute to override. Any `style` may name theme
+  variables (`"bold $accent"`), and every style is resolved again on each
+  redraw, so a theme change recolours the plot.
+- **The space around the data is CSS grid tracks**: `grid-columns: 10 1fr` for
+  the tick labels on the left, `grid-rows: 2 1fr 3` for the y label above and
+  the x tick labels and label below. Override them on `Plot` to make room for
+  longer labels; y tick labels are cropped to the space they get.
+- **The component classes `plot--axis`, `plot--tick` and `plot--label`** style
+  the frame and tick marks, the tick labels and the axis labels. The axis takes
+  `$primary` while the plot has focus.
+
+## Legend
+
+- **`legend` is the corner it starts out in** (`"top-left"`, `"top-right"`,
+  `"bottom-left"`, `"bottom-right"`), or None for no legend. It lists every
+  dataset that has a `label`.
+- **The legend can be dragged.** Letting go re-anchors it to the corner it is
+  nearest, so a resize keeps it where it was put relative to that corner.
+  Dragging it is allowed even with `allow_pan_and_zoom` off, since moving the
+  legend changes nothing about the data shown.
+
+## Zoom and pan
+
+- **The wheel zooms around the pointer**: over the data, both axes; over a
+  row or column of tick labels, that axis only. Dragging pans the same way.
+  A drag captures the mouse, so it carries on past the edge of the plot.
+- **The keys** are `+`/`-` (zoom), `ctrl+=`/`ctrl+-` for the x axis only,
+  `ctrl+shift+=`/`ctrl+shift+-` for the y axis only, the arrow keys (pan)
+  and `r` (reset).
+- **`allow_pan_and_zoom=False` turns off the wheel, dragging and the keys**,
+  and the keys leave the footer (through `check_action`). The wheel then
+  passes through, so a plot inside a scrolling container does not block the
+  scroll. `invert_mouse_wheel=True` flips the wheel.
+- **Zooming, panning and resetting post `Plot.RangeChanged`**, which carries
+  the new `x_range` and `y_range` and has a `control`, so
+  `@on(Plot.RangeChanged, "#id")` works. Assigning `x_limits` posts nothing:
+  the app already knows.
 
 ## Provenance
 
@@ -58,10 +109,11 @@ both by David Fokkema and MIT-licensed. They were brought in as they were at:
 The code was absorbed, not vendored: it is changed here as tcoda needs, and
 not kept in sync with upstream. The commit that imported it changed nothing
 but headers and import paths, so `git diff` against that commit shows
-everything tcoda has done since. Every file in `src/tcoda/plot/` stays under
-the MIT license, as do the two test files that came along
-(`tests/test_plot_formatters.py`, `tests/test_plot_transformations.py`).
+everything tcoda has done since. By now that is most of it: the widget was
+rebuilt as a native Textual one, and upstream's API (`PlotWidget`,
+`set_xlabel`, `HiResMode.BRAILLE`, ...) is gone.
 
-The canvas (`_canvas.py`, `_hires.py`) is private to `tcoda.plot`. Both it and
-the plot widget import Textual's private `textual._box_drawing`, so check
-these two when raising the Textual pin.
+Every file in `src/tcoda/plot/` stays under the MIT license, as do the two
+test files that came along (`tests/test_plot_formatters.py` and
+`tests/test_plot_viewport.py`). The canvas (`_canvas.py`, `_hires.py`) is
+private to `tcoda.plot` and depends on no private Textual module.

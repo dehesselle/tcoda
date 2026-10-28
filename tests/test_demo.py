@@ -15,7 +15,9 @@ from tcoda.demo._app import BrowserScreen
 from tcoda.demo._browser import FileTable, format_age, format_size
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
+from tcoda.demo._sizes import SizesDialog, sizes_by_extension
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
+from tcoda.plot import Plot
 from tcoda.settings import config
 from tcoda.widgets import ChordViewer, Countdown, Header, LogViewer, MenuBar
 
@@ -103,6 +105,7 @@ async def test_a_hesitant_chord_shows_the_viewer_and_sorts() -> None:
         ("confirm", ConfirmDialog),
         ("delete", ConfirmDialog),
         ("filter", FilterDialog),
+        ("sizes", SizesDialog),
         ("about", AboutDialog),
         ("settings", SettingsDialog),
     ],
@@ -117,6 +120,18 @@ async def test_each_dialog_opens_and_escapes(action: str, dialog: type) -> None:
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, BrowserScreen)
+
+
+async def test_the_sizes_chart_has_a_bar_per_extension() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        files = app.screen._files
+        await pilot.press("ctrl+k", "d", "p")
+        await pilot.pause()
+        assert isinstance(app.screen, SizesDialog)
+        axis = "".join(app.screen.query_one(Plot).query_one("#plot-x-axis")._chars[0])
+        assert axis.split() == list(sizes_by_extension(files))
 
 
 async def test_the_settings_dialog_lists_the_demo_groups() -> None:

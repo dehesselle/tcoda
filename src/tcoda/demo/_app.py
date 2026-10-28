@@ -26,6 +26,7 @@ from tcoda.chords import ChordMixin
 from tcoda.demo._browser import FileInfo, FileTable, Sidebar, scan
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
+from tcoda.demo._sizes import SizesDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
 from tcoda.settings import config
 from tcoda.terminal_title import TerminalTitleMixin
@@ -79,6 +80,7 @@ class BrowserScreen(Screen[None]):
         Binding("ctrl+k d c", "confirm", "Confirm", show=False),
         Binding("ctrl+k d d", "delete", "Delete (danger)", show=False),
         Binding("ctrl+k d f", "filter", "Filter", show=False),
+        Binding("ctrl+k d p", "sizes", "Sizes chart", show=False),
         Binding("ctrl+k d a", "about", "About", show=False),
         Binding("ctrl+k d s", "settings", "Settings", show=False),
         Binding("ctrl+k r", "refresh", "Refresh now", show=False),
@@ -119,6 +121,13 @@ class BrowserScreen(Screen[None]):
                 yield MenuItem("Confirm ...", id="confirm", mnemonic="c")
                 yield MenuItem("Delete files ...", id="delete", mnemonic="d")
                 yield MenuItem("Filter ...", id="filter", mnemonic="f", shortcut="f2")
+                yield MenuItem(
+                    "Sizes chart ...",
+                    id="sizes",
+                    mnemonic="s",
+                    shortcut="ctrl+k d p",
+                    action="sizes",
+                )
             with Menu("View", id="view"):
                 # `action=` strings run on this screen, like a key binding's.
                 yield MenuItem("Sort by name", id="sort-name", action="sort('name')")
@@ -337,6 +346,9 @@ class BrowserScreen(Screen[None]):
         else:
             dialog_log.info("filter cleared")
         self._show(self._files)
+
+    def action_sizes(self) -> None:
+        self.app.push_screen(SizesDialog(self.title, self._files))
 
     def action_about(self) -> None:
         self.app.push_screen(
