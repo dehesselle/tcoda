@@ -96,11 +96,26 @@ default instead.
 `tcoda/__init__.py` is deliberately empty of imports: pulling in `tcoda` must not
 drag Textual (or a config file read) into a module that only wanted the
 version. Consumers import from `tcoda.widgets`, `tcoda.dialogs`, `tcoda.settings`,
-`tcoda.chords`, `tcoda.terminal_title` or `tcoda.log_sink`.
+`tcoda.chords`, `tcoda.terminal_title`, `tcoda.log_sink` or `tcoda.plot`.
 
 The same rule applies between subpackages: `tcoda.widgets` stays importable
 without the settings machinery, so `SettingsMenuItem` imports
 `SettingsDialog` lazily, when it is chosen.
+
+## Code from elsewhere lives in its own subpackage
+
+[`tcoda.plot`](plot.md) began as someone else's code (textual-plot and
+textual-hires-canvas, MIT). It was absorbed rather than vendored: tcoda
+changes it freely and does not re-sync with upstream. One directory draws
+every boundary that comes with that:
+
+- **License**: everything under `src/tcoda/plot/` is MIT, the rest of tcoda
+  0BSD, so "`tcoda.plot` is MIT" stays literally true. A file changed here
+  gains a copyright line but keeps its license.
+- **Provenance**: the commit that brought the code in changed only headers
+  and import paths, so the history shows exactly what tcoda made of it.
+- **Dependencies**: nothing outside `tcoda.plot` imports it, so whatever it
+  needs stays out of `tcoda.widgets` and the rest.
 
 ## Persisted state is an optimisation, never a dependency
 
