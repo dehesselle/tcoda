@@ -15,7 +15,8 @@ natural place. All of it is ordinary consumer code, so
 | [Header](widgets/Header.md) | Top row. The middle tracks the screen title, which is the directory being browsed. Click the left area for About, the right one for versions. |
 | [MenuBar](widgets/MenuBar.md) | F9, or click where it appears. Items use `@on(MenuItem.Pressed)` (File, Dialogs) and `action=` strings (View). View has one disabled item. |
 | [Resizable](widgets/Resizable.md) | The directory tree on the left. Drag its right border. |
-| [DataTable](widgets/DataTable.md) | The file list. Click a header to sort. Size and Modified show rounded values but rank by the exact bytes and mtime. Hover a cell for its tooltip. |
+| [DataTable](widgets/DataTable.md) | The file list, and the Extensions tab beside it. Click a header to sort. Size and Modified show rounded values but rank by the exact bytes and mtime. Hover a cell for its tooltip. |
+| [TabbedContent](widgets/TabbedContent.md) | Above the file list: Files (`f`), Extensions (`e`) and a disabled Preview (`p`). The letters work once the focus is right of the tree, and take it into the tab. Focus the tab bar and ←/→ walk it instead. |
 | [Footer](widgets/Footer.md) | Bottom row: `F9`, `F1` and `^q` pinned, the other keys sorted, and a countdown plus a file count in the status corner. |
 | [Countdown](widgets/Countdown.md) | Footer status corner. It spins during an auto-refresh. Turning auto-refresh off in the settings hides it. |
 | [LogViewer](widgets/LogViewer.md) | F1. Four `tcoda.demo.*` loggers write to it, so the source filter has something to filter. |

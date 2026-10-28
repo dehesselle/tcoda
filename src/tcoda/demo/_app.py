@@ -19,11 +19,11 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import Tree
+from textual.widgets import Static, Tree
 
 import tcoda
 from tcoda.chords import ChordMixin
-from tcoda.demo._browser import FileInfo, FileTable, Sidebar, scan
+from tcoda.demo._browser import ExtensionTable, FileInfo, FileTable, Sidebar, scan
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
 from tcoda.demo._sizes import SizesDialog
@@ -47,6 +47,8 @@ from tcoda.widgets import (
     MenuItem,
     MenuSeparator,
     SettingsMenuItem,
+    TabbedContent,
+    TabPane,
 )
 
 #: What the demo browses: the installed `tcoda` package itself.
@@ -65,6 +67,13 @@ class BrowserScreen(Screen[None]):
 
     DEFAULT_CSS = """
     BrowserScreen > #browser {
+        height: 1fr;
+    }
+    BrowserScreen #views {
+        width: 1fr;
+        height: 1fr;
+    }
+    BrowserScreen #views > ContentSwitcher, BrowserScreen #views TabPane {
         height: 1fr;
     }
     """
@@ -159,7 +168,15 @@ class BrowserScreen(Screen[None]):
                 )
         with Horizontal(id="browser"):
             yield Sidebar(ROOT, id="sidebar")
-            yield FileTable(id="files")
+            # Letters switch tabs while the focus is in here, not in the tree.
+            # Preview is disabled, so its letter does nothing.
+            with TabbedContent(id="views"):
+                with TabPane("Files", mnemonic="f", id="tab-files"):
+                    yield FileTable(id="files")
+                with TabPane("Extensions", mnemonic="e", id="tab-extensions"):
+                    yield ExtensionTable(id="extensions")
+                with TabPane("Preview", mnemonic="p", id="tab-preview", disabled=True):
+                    yield Static("Not in this demo.")
         with Footer(pinned=(OPEN_ACTION, TOGGLE_ACTION, "ctrl+q"), sort=True):
             yield Countdown(id="refresh-countdown")
         yield LogViewer()
@@ -188,6 +205,7 @@ class BrowserScreen(Screen[None]):
         interval = max(1, config.get(REFRESH_INTERVAL))
         countdown.remaining = min(countdown.remaining, interval)
         self.query_one(FileTable).restyle()
+        self.query_one(ExtensionTable).restyle()
 
     # --------------------------------------------------------------- browsing
 
@@ -212,6 +230,7 @@ class BrowserScreen(Screen[None]):
             if not self._pattern or fnmatch(info.path.name, self._pattern)
         ]
         self.query_one(FileTable).show(shown)
+        self.query_one(ExtensionTable).show(shown)
         self.query_one(Footer).status.update(
             f"{len(shown)} of {len(files)} files"
             if self._pattern

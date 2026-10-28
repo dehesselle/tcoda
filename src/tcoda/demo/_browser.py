@@ -174,3 +174,66 @@ class FileTable(DataTable):
             modified = datetime.fromtimestamp(info.modified, tz=UTC).astimezone()
             return modified.strftime("%Y-%m-%d %H:%M:%S")
         return None
+
+
+class ExtensionTable(DataTable):
+    """The same files, totalled by extension: the second tab beside the list."""
+
+    DEFAULT_CSS = """
+    ExtensionTable {
+        width: 1fr;
+        height: 1fr;
+    }
+    """
+
+    def __init__(self, *, id: str | None = None) -> None:
+        super().__init__(cursor_type="row", zebra_stripes=True, id=id)
+        #: Keyed by the row key, which is the extension: file count, bytes.
+        self.totals: dict[str, tuple[int, int]] = {}
+        self.add_column("Extension", key="extension", sortable=True)
+        self.add_column(
+            "Files",
+            key="files",
+            sortable=True,
+            sort_key=lambda row: self.totals[row.value][0],
+        )
+        self.add_column(
+            "Size",
+            key="size",
+            sortable=True,
+            sort_key=lambda row: self.totals[row.value][1],
+        )
+
+    def show(self, files: Iterable[FileInfo]) -> None:
+        """Replace the rows. An active sort is reapplied by `DataTable`."""
+        self.clear()
+        totals: dict[str, tuple[int, int]] = {}
+        for info in files:
+            extension = info.path.suffix or "(none)"
+            count, size = totals.get(extension, (0, 0))
+            totals[extension] = (count + 1, size + info.size)
+        self.totals = dict(sorted(totals.items()))
+        units = config.get(SIZE_UNITS)
+        for extension, (count, size) in self.totals.items():
+            self.add_row(
+                Text(extension),
+                Text(str(count), justify="right"),
+                Text(format_size(size, units), justify="right"),
+                key=extension,
+            )
+
+    def restyle(self) -> None:
+        """Re-render the sizes, for when the units setting changed."""
+        units = config.get(SIZE_UNITS)
+        for extension, (_, size) in self.totals.items():
+            self.update_cell(
+                extension,
+                "size",
+                Text(format_size(size, units), justify="right"),
+                update_width=True,
+            )
+
+    def get_cell_tooltip(self, row_key: RowKey, column_key: ColumnKey) -> str | None:
+        if column_key.value != "size" or row_key.value not in self.totals:
+            return None
+        return f"{self.totals[row_key.value][1]:,} bytes"

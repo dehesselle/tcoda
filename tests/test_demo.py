@@ -15,7 +15,7 @@ from textual.widgets import Label, Tree
 from tcoda import settings as settings_module
 from tcoda.demo import DemoApp
 from tcoda.demo._app import BrowserScreen
-from tcoda.demo._browser import FileTable, format_age, format_size
+from tcoda.demo._browser import ExtensionTable, FileTable, format_age, format_size
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
 from tcoda.demo._sizes import SizesDialog, sizes_by_extension
@@ -23,7 +23,14 @@ from tcoda.demo._timeline import SHORTEST_SPAN, TimelineDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
 from tcoda.plot import Plot
 from tcoda.settings import config
-from tcoda.widgets import ChordViewer, Countdown, Header, LogViewer, MenuBar
+from tcoda.widgets import (
+    ChordViewer,
+    Countdown,
+    Header,
+    LogViewer,
+    MenuBar,
+    TabbedContent,
+)
 
 SIZE = (120, 36)
 
@@ -65,6 +72,32 @@ async def test_moving_in_the_tree_browses_that_directory() -> None:
         await pilot.pause()
         assert app.screen.title == "tcoda/widgets"
         assert "_footer.py" in names(app.screen.query_one(FileTable))
+
+
+async def test_letters_switch_the_tabs_beside_the_tree() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        tabs = app.screen.query_one(TabbedContent)
+        # In the tree, a letter is not a tab's.
+        await pilot.press("e")
+        await pilot.pause()
+        assert tabs.active == "tab-files"
+        app.screen.query_one(FileTable).focus()
+        await pilot.press("e")
+        await pilot.pause()
+        assert tabs.active == "tab-extensions"
+        extensions = app.screen.query_one(ExtensionTable)
+        assert app.focused is extensions
+        assert ".py" in extensions.totals
+        # Preview is disabled.
+        await pilot.press("p")
+        await pilot.pause()
+        assert tabs.active == "tab-extensions"
+        await pilot.press("f")
+        await pilot.pause()
+        assert tabs.active == "tab-files"
+        assert app.focused is app.screen.query_one(FileTable)
 
 
 async def test_f9_opens_the_menu_bar_and_f1_the_log() -> None:
