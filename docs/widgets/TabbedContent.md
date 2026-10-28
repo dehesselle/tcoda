@@ -33,12 +33,22 @@ in too; it just has no letter.
   Setting `active` directly skips that check; `action_activate_tab` does not.
   A disabled tab's letter is not colored either, as in a menu, whichever way
   it was disabled — `disable_tab` or the pane's `disabled`.
-- **The focus follows into the pane**, on any change of tab — letter, click
-  or `active` — unless it is on the tab bar: someone walking the tabs with
-  left/right must not have it yanked away after the first step. It also stays
-  put when it is already inside the pane, or outside the widget altogether.
+- **The focus follows into the pane** on any change of tab. A letter always
+  takes it in; a click, an arrow key or `active` does unless the focus is on
+  the tab bar: someone walking the tabs with left/right must not have it
+  yanked away after the first step. It also stays put when it is already
+  inside the pane, or outside the widget altogether.
+- **A pane with nothing to focus yet parks the focus on the tab bar** — one
+  still `loading`, say. Left where Textual drops it, the focus would be
+  nowhere, and the letters and arrow keys with it. Call
+  `focus_active_pane()` once the pane's content is ready: it takes the focus
+  in from a parked tab bar or from nowhere, but not from a tab bar the user
+  has started walking, nor from anywhere else.
 - **`focus_target(pane)` picks what gets it**: the pane's first focusable
-  widget. Override it for a pane whose keys belong to another one.
+  widget that is displayed. A hidden search box or a not-yet-drawn chart is
+  skipped, since focusing it would drop the focus altogether; with nothing to
+  take it, the focus stays where it was. Override it for a pane whose keys
+  belong to another widget.
 - **At start the focus goes into the pane, not the tab bar**, where Textual's
   auto-focus would put it as the first focusable widget. An `AUTO_FOCUS` aimed
   elsewhere, inside the widget or beside it, is kept.

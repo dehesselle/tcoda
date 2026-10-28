@@ -15,14 +15,17 @@ not::
 
 A `mnemonic` colors its letter in the title the way a footer shows a key, and
 binds it on the `TabbedContent`, so it works wherever the focus is inside it.
-Switching tabs -- by letter, click or `active` -- moves the focus into the pane
-just shown, unless the focus is on the tab bar itself: someone walking the
-tabs with left/right must not have it yanked away after the first step.
+Switching tabs moves the focus into the pane just shown. A letter always
+does; a click, an arrow key or `active` does unless the focus is on the tab
+bar itself: someone walking the tabs with left/right must not have it yanked
+away after the first step.
 
 Three Textual details are why this is a widget rather than a recipe:
 
 * Textual hides the pane being left and drops the focus with it rather than
   moving it, so without the focus following, the next mnemonic goes nowhere.
+  A pane with nothing to take the focus yet -- still loading, say -- gets it
+  parked on the tab bar for the same reason, until `focus_active_pane`.
 * Setting `active` skips the disabled check that a click or an arrow key gets,
   so `action_activate_tab` repeats it.
 * Auto-focus lands on the tab bar, the first focusable widget, which is the
@@ -59,6 +62,16 @@ ACTIVATE_ACTION = "activate_tab"
 #: against the footer's own background, and solarized-light's equals the
 #: screen background, so anywhere else the letter would vanish.
 MNEMONIC_STYLE = "$accent bold"
+
+
+def _displayed_within(widget: Widget, pane: Widget) -> bool:
+    """Whether `widget` and everything between it and `pane` is displayed."""
+    node: Widget | None = widget
+    while node is not None and node is not pane:
+        if not node.display:
+            return False
+        node = node.parent  # type: ignore[assignment]
+    return True
 
 
 class TabPane(TextualTabPane):
@@ -110,6 +123,11 @@ class TabbedContent(TextualTabbedContent):
     #: Set once the start-up focus is settled; until then a tab's activation
     #: is the initial one, and moving the focus would pre-empt auto-focus.
     _started = False
+    #: The tab bar holds the focus because this widget put it there, for want
+    #: of anything in the pane to take it -- not because the user is walking it.
+    _parked = False
+    #: The tab about to be activated was asked for by its letter.
+    _by_letter = False
 
     def on_mount(self) -> None:
         for pane in self.get_child_by_type(ContentSwitcher).query_children(
@@ -147,15 +165,54 @@ class TabbedContent(TextualTabbedContent):
         tab = self.get_tab(pane_id)
         if tab.disabled or not tab.display:
             return
+        if self.active == pane_id:
+            # No TabActivated follows, but a letter still takes the focus in.
+            self._focus_into(self.get_pane(pane_id))
+            return
+        self._by_letter = True
         self.active = pane_id
+
+    def focus_active_pane(self) -> None:
+        """Move the focus into the shown pane, now that it can take it.
+
+        For a pane that had nothing focusable when it was shown -- still
+        loading, say -- and so left the focus parked on the tab bar. Call it
+        when the content is ready. It leaves the focus alone where moving it
+        would be wrong: on a tab bar the user is walking, already inside the
+        pane, or outside this widget.
+        """
+        pane = self.active_pane
+        if pane is None:
+            return
+        focused = self.screen.focused
+        if focused is not None:
+            if self._is_own_tab_bar(focused):
+                if not self._parked:
+                    return
+            elif self not in focused.ancestors or pane in focused.ancestors:
+                return
+        if (target := self.focus_target(pane)) is not None:
+            target.focus()
 
     def focus_target(self, pane: TextualTabPane) -> Widget | None:
         """What gets the focus when `pane` is shown: its first focusable widget.
 
+        A widget with `display` off, or inside one, does not count: Textual's
+        `focusable` only looks at `visibility`, and focusing a widget that is
+        not displayed drops the focus altogether. Nothing, then, leaves the
+        focus where it was.
+
         Override for a pane whose first focusable widget is not the one its
         keys belong to.
         """
-        return next((widget for widget in pane.query("*") if widget.focusable), None)
+        return next(
+            (
+                widget
+                for widget in pane.query("*")
+                if widget.focusable and _displayed_within(widget, pane)
+            ),
+            None,
+        )
 
     # ----------------------------------------------------------------- focus
 
@@ -163,15 +220,22 @@ class TabbedContent(TextualTabbedContent):
         self, event: TextualTabbedContent.TabActivated
     ) -> None:
         # Not stopped: the app's own handlers (lazy loading, mostly) still run.
+        by_letter, self._by_letter = self._by_letter, False
         if event.tabbed_content is not self or not self._started:
             # The initial tab's activation, while mounting: _focus_on_start's.
             return
         focused = self.screen.focused
         if focused is not None:
-            if self._is_own_tab_bar(focused) or self not in focused.ancestors:
-                # The tab bar is being walked, or the focus is not ours.
+            if self._is_own_tab_bar(focused):
+                if not by_letter:
+                    # A click or an arrow key: the tab bar is being walked,
+                    # whether or not the focus was parked there.
+                    self._parked = False
+                    return
+            elif self not in focused.ancestors:
+                # The focus is not ours to move.
                 return
-            if event.pane in focused.ancestors:
+            elif event.pane in focused.ancestors:
                 # Already inside: an app focused a widget in a hidden pane,
                 # and Textual switched to that pane for it.
                 return
@@ -200,9 +264,23 @@ class TabbedContent(TextualTabbedContent):
         if self.screen.focused is None and self.active_pane is not None:
             self._focus_into(self.active_pane)
 
+    def _on_descendant_blur(self, event: events.DescendantBlur) -> None:
+        if self._is_own_tab_bar(event.widget):
+            self._parked = False
+
     def _focus_into(self, pane: TextualTabPane) -> None:
+        """Focus the pane's target, or park on the tab bar if it has none.
+
+        Parked rather than left alone: the focus was in the pane just hidden,
+        and Textual drops it from there, so the letters bound here and the
+        tab bar's arrow keys would go with it. `focus_active_pane` takes it
+        in once the pane can have it.
+        """
         if (target := self.focus_target(pane)) is not None:
             target.focus()
+        else:
+            self.get_child_by_type(ContentTabs).focus()
+            self._parked = True
 
     def _is_own_tab_bar(self, widget: Widget | None) -> bool:
         return isinstance(widget, ContentTabs) and widget.tabbed_content is self

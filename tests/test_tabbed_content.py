@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
+from textual.containers import Vertical
 from textual.content import Content
 from textual.widgets import DataTable, Input
 from textual.widgets import TabPane as TextualTabPane
@@ -144,6 +145,34 @@ async def test_focusing_into_a_hidden_pane_is_not_overridden() -> None:
         assert app.focused is app.query_one("#find")
 
 
+async def test_a_widget_that_is_not_displayed_is_not_a_focus_target() -> None:
+    """Textual's `focusable` ignores `display`, and focusing such a widget
+    drops the focus: a hidden search box must not be picked, nor anything
+    inside a hidden container."""
+
+    class Hidden(App[None]):
+        def compose(self) -> ComposeResult:
+            with TabbedContent():
+                with TabPane("One", mnemonic="o", id="tab-one"):
+                    yield DataTable(id="first")
+                with TabPane("Two", mnemonic="t", id="tab-two"):
+                    yield Input(id="search")
+                    with Vertical(id="box"):
+                        yield Input(id="boxed")
+                    yield DataTable(id="table")
+
+        def on_mount(self) -> None:
+            self.query_one("#search").display = False
+            self.query_one("#box").display = False
+
+    app = Hidden()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("t")
+        await pilot.pause()
+        assert app.focused is app.query_one("#table")
+
+
 async def test_focus_target_can_be_overridden() -> None:
     class Second(TabbedContent):
         def focus_target(self, pane):
@@ -264,5 +293,93 @@ async def test_a_tab_changed_from_outside_leaves_the_focus_outside() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one(TabbedContent).active = "tab-data"
+        await pilot.pause()
+        assert app.focused is app.query_one("#beside")
+
+
+async def test_a_letter_takes_the_focus_in_even_from_the_tab_bar() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one(ContentTabs).focus()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        assert app.focused is app.query_one("#data")
+        # The letter of the tab already shown, too.
+        app.query_one(ContentTabs).focus()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        assert app.focused is app.query_one("#data")
+
+
+class Loading(App[None]):
+    """A second tab whose table is still loading, so nothing in it can take
+    the focus yet."""
+
+    def compose(self) -> ComposeResult:
+        with TabbedContent():
+            with TabPane("One", mnemonic="o", id="tab-one"):
+                yield DataTable(id="first")
+            with TabPane("Two", mnemonic="t", id="tab-two"):
+                yield DataTable(id="second")
+
+    def on_mount(self) -> None:
+        self.query_one("#second").loading = True
+
+
+async def test_with_nothing_to_focus_the_focus_parks_on_the_tab_bar() -> None:
+    app = Loading()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tabs = app.query_one(TabbedContent)
+        await pilot.press("t")
+        await pilot.pause()
+        assert isinstance(app.focused, ContentTabs)
+        # Parked, the letters still work.
+        await pilot.press("o")
+        await pilot.pause()
+        assert tabs.active == "tab-one"
+        assert app.focused is app.query_one("#first")
+
+
+async def test_focus_active_pane_takes_the_focus_in_once_ready() -> None:
+    app = Loading()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tabs = app.query_one(TabbedContent)
+        await pilot.press("t")
+        await pilot.pause()
+        app.query_one("#second").loading = False
+        tabs.focus_active_pane()
+        await pilot.pause()
+        assert app.focused is app.query_one("#second")
+
+
+async def test_focus_active_pane_leaves_a_walked_tab_bar_alone() -> None:
+    app = Loading()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tabs = app.query_one(TabbedContent)
+        await pilot.press("t")
+        await pilot.pause()
+        # Parked on the bar; the user now walks it, and comes back.
+        await pilot.press("left")
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+        assert tabs.active == "tab-two"
+        app.query_one("#second").loading = False
+        tabs.focus_active_pane()
+        await pilot.pause()
+        assert isinstance(app.focused, ContentTabs)
+
+
+async def test_focus_active_pane_leaves_focus_outside_alone() -> None:
+    app = Harness(input_first=True)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one(TabbedContent).focus_active_pane()
         await pilot.pause()
         assert app.focused is app.query_one("#beside")
