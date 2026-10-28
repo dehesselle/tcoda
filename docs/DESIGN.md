@@ -29,6 +29,15 @@ name and stays a drop-in: [`DataTable`](widgets/DataTable.md) and
 import, and everything they do not add is Textual's, unchanged. The pieces mix
 both ways, so a Textual `TabPane` still works inside a tcoda `TabbedContent`.
 
+They are composable the way Textual's are, too. Every public widget and dialog
+takes the standard `name`, `id` and `classes` (and a widget `disabled`), so
+it can be named, styled and switched off like any other. A widget works
+wherever it is mounted — the app's screen or a pushed one, mounted at start or
+later — and leaves nothing behind when it is removed. Where a second instance
+would bring only pain, the limit is stated and enforced with an error at
+mount, never left to misbehave quietly: one widget owns a screen key (see
+below).
+
 ## Styling is inline `DEFAULT_CSS`
 
 All styling is inline `DEFAULT_CSS` — a library cannot rely on a consumer's
