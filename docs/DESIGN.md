@@ -13,6 +13,22 @@ widget replaces.
 The name is short for "Textual coda": what comes after the widgets Textual
 itself provides.
 
+## Widgets feel like Textual's own
+
+A tcoda widget is used the way a Textual one is: declared inline in
+`compose()`, configured by constructor arguments, reactives and CSS, and heard
+from through messages that bubble, so `@on(MenuItem.Pressed, "#open")` reads
+like `@on(Button.Pressed, "#open")`. It reaches for Textual's own mechanisms
+before inventing any: real `Binding`s and action strings rather than key
+handlers, messages rather than callbacks, an overridable method as the
+extension point.
+
+Where tcoda extends a Textual widget rather than adding a new one, it keeps the
+name and stays a drop-in: [`DataTable`](widgets/DataTable.md) and
+[`TabbedContent`](widgets/TabbedContent.md) replace Textual's by changing the
+import, and everything they do not add is Textual's, unchanged. The pieces mix
+both ways, so a Textual `TabPane` still works inside a tcoda `TabbedContent`.
+
 ## Styling is inline `DEFAULT_CSS`
 
 All styling is inline `DEFAULT_CSS` — a library cannot rely on a consumer's
@@ -57,6 +73,11 @@ one.
   it.
 - `show_key=False` keeps the binding out of the footer altogether, but *where*
   it appears is never the widget's business — that is the footer's.
+
+A widget that holds the focus while it is in use binds its keys on itself
+instead. [`TabbedContent`](widgets/TabbedContent.md)'s letter keys work while
+the focus is inside it, and two on one screen keep their letters apart; bound
+on the screen, they would fire from anywhere and collide.
 
 ## Keys are shown through `App.get_key_display`
 

@@ -40,6 +40,7 @@ from tcoda.widgets._menubar import OPEN_ACTION, MenuBar
 from tcoda.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
 from tcoda.widgets._resizable import Resizable
 from tcoda.widgets._settings_item import SettingsMenuItem
+from tcoda.widgets._tabbed_content import TabbedContent, TabPane
 
 __all__ = [
     "OPEN_ACTION",
@@ -65,5 +66,7 @@ __all__ = [
     "MenuSeparator",
     "Resizable",
     "SettingsMenuItem",
+    "TabPane",
+    "TabbedContent",
     "sort_by_key",
 ]
