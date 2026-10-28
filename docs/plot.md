@@ -59,6 +59,16 @@ class MyApp(App[None]):
   `tz`, and it never raises, whatever the range: there are no ticks before
   year 1 or after 9999. So plot real timestamps, not times shifted by the
   zone's offset.
+- **Ticks fit the plot's size.** y gets one per `Y_TICK_SPACING` rows (3) at
+  most. x gets one per `X_TICK_SPACING` columns (8) at most, and fewer where
+  their labels would come closer than two cells. Both are class attributes.
+- **An end that follows the data goes `AUTO_MARGIN` (5%) past it**, so the
+  highest and lowest values are not hidden under the frame. A fixed end goes
+  exactly where it was put.
+- **A lone value gets a range from its formatter's `around`**: half the value
+  either side (-1 to 1 around zero), an hour either side for dates, half a
+  category for categories. A fixed end stays fixed, so `y_limits=(0, None)`
+  over all zeros shows 0 to 1.
 
 ## Look
 
@@ -66,11 +76,14 @@ class MyApp(App[None]):
   `$secondary`, `$accent`, `$success`, `$warning`, `$error`, from
   `Plot.PALETTE`, a class attribute to override. Any `style` may name theme
   variables (`"bold $accent"`), and every style is resolved again on each
-  redraw, so a theme change recolours the plot.
-- **The space around the data is CSS grid tracks**: `grid-columns: 10 1fr` for
-  the tick labels on the left, `grid-rows: 2 1fr 3` for the y label above and
-  the x tick labels and label below. Override them on `Plot` to make room for
-  longer labels; y tick labels are cropped to the space they get.
+  redraw, so a theme change recolours the plot. A translucent colour
+  (`"$foreground 60%"`) is blended with the plot's background.
+- **The space around the data is CSS grid tracks, `auto` by default**:
+  `grid-columns: auto 1fr` for the y tick labels on the left, as wide as the
+  widest of them; `grid-rows: auto 1fr auto` for the y label above and the x
+  tick labels and label below, with no room for an axis label that is not
+  set. Override them on `Plot` for fixed sizes; y tick labels are then cropped
+  to the space they get.
 - **The component classes `plot--axis`, `plot--tick` and `plot--label`** style
   the frame and tick marks, the tick labels and the axis labels. The axis takes
   `$primary` while the plot has focus.

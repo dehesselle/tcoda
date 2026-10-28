@@ -15,10 +15,11 @@ runs.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from itertools import pairwise
 from math import isfinite
 from numbers import Real
-from typing import ClassVar, Literal, get_args
+from typing import ClassVar, Literal, NamedTuple, get_args
 
 from rich.style import Style as RichStyle
 from textual import events
@@ -73,6 +74,17 @@ _VIEW_ACTIONS = frozenset(
 )
 
 
+class _XTick(NamedTuple):
+    """An x tick as drawn: its column on the data canvas, and its label's."""
+
+    x: int
+    label: str
+    align: Literal["center", "right"]
+    #: The first and last column the label covers.
+    start: int
+    end: int
+
+
 class Plot(Widget, can_focus=True):
     """Line, scatter, bar and error-bar plots, with axes that scale themselves.
 
@@ -100,13 +112,13 @@ class Plot(Widget, can_focus=True):
 
     # The grid tracks are the space left of and around the data: tick labels
     # to the left, the y label above, tick labels and the x label below.
-    # Override them in CSS to make room for longer labels.
+    # They are `auto`, sized to what is drawn in them; CSS overrides them.
     DEFAULT_CSS = """
     Plot {
         layout: grid;
         grid-size: 2 3;
-        grid-columns: 10 1fr;
-        grid-rows: 2 1fr 3;
+        grid-columns: auto 1fr;
+        grid-rows: auto 1fr auto;
 
         & > .plot--axis {
             color: $secondary;
@@ -174,6 +186,14 @@ class Plot(Widget, can_focus=True):
     KEYBOARD_ZOOM_FACTOR: ClassVar[float] = 0.15
     #: How many cells one key press pans.
     KEYBOARD_PAN_CELLS: ClassVar[float] = 2.0
+    #: The fewest columns between x ticks; they are spaced wider still where
+    #: their labels need it.
+    X_TICK_SPACING: ClassVar[int] = 8
+    #: The fewest rows between y ticks.
+    Y_TICK_SPACING: ClassVar[int] = 3
+    #: How much further than the data an end that follows it goes, as a
+    #: fraction of the range, so the extremes stay clear of the frame.
+    AUTO_MARGIN: ClassVar[float] = 0.05
     #: Styles handed out, in turn, to datasets added without one.
     PALETTE: ClassVar[tuple[str, ...]] = (
         "$primary",
@@ -258,6 +278,7 @@ class Plot(Widget, can_focus=True):
         self._legend = Legend(id="plot-legend")
         self._area = Container(id="plot-area")
         self._place_legend(self.legend, Offset())
+        self._size_label_rows()
 
     def compose(self) -> ComposeResult:
         yield self._y_label_canvas
@@ -500,18 +521,45 @@ class Plot(Widget, can_focus=True):
         return self._range(self._y_view, self.y_limits, 1)
 
     def _range(self, view: Range | None, limits: Limits, axis: int) -> Range:
+        formatter = self.x_formatter if axis == 0 else self.y_formatter
         if view is not None:
             low, high = view
-        else:
-            low, high = limits
-            values = [v for dataset in self._datasets for v in dataset.extent()[axis]]
-            if low is None:
-                low = min(values, default=0.0)
-            if high is None:
-                high = max(values, default=1.0)
+            if low == high:
+                low, high = formatter.around(low)
+            return float(low), float(high)
+
+        values = [v for dataset in self._datasets for v in dataset.extent()[axis]]
+        fixed_low, fixed_high = limits
+        followed = bool(values)
+        if not values:
+            # Nothing to follow: an open end meets the fixed one, or with
+            # both open, the axis shows 0 to 1.
+            values = (
+                [0.0, 1.0]
+                if fixed_low is None and fixed_high is None
+                else [fixed_low if fixed_high is None else fixed_high]
+            )
+        low = min(values) if fixed_low is None else fixed_low
+        high = max(values) if fixed_high is None else fixed_high
+        if fixed_low is None and fixed_high is not None:
+            low = min(low, high)
+        if fixed_high is None and fixed_low is not None:
+            high = max(low, high)
+
         if low == high:
-            # A single value still needs a range to sit in the middle of.
-            low, high = low - 1e-6, high + 1e-6
+            # A single value still needs a range to sit in, but a fixed end
+            # stays where it was put.
+            around_low, around_high = formatter.around(low)
+            if fixed_low is None or fixed_high is not None:
+                low = around_low
+            if fixed_high is None or fixed_low is not None:
+                high = around_high
+        elif followed:
+            margin = (high - low) * self.AUTO_MARGIN
+            if fixed_low is None:
+                low -= margin
+            if fixed_high is None:
+                high += margin
         return float(low), float(high)
 
     def validate_x_limits(self, limits: Limits) -> Limits:
@@ -546,9 +594,23 @@ class Plot(Widget, can_focus=True):
         self.call_later(self._redraw)
 
     # Anything else that changes the picture just asks for a redraw.
-    watch_x_label = watch_y_label = _schedule_redraw
     watch_x_ticks = watch_y_ticks = _schedule_redraw
     watch_x_formatter = watch_y_formatter = _schedule_redraw
+
+    def watch_x_label(self) -> None:
+        self._size_label_rows()
+        self._schedule_redraw()
+
+    watch_y_label = watch_x_label
+
+    def _size_label_rows(self) -> None:
+        """Make room for the axis labels there are, and none for the rest."""
+        # The y label, and a row between it and the top tick label.
+        self._y_label_canvas.content_height = 2 if self.y_label else 0
+        # The tick labels, then a row and the x label.
+        self._x_axis_canvas.content_height = 3 if self.x_label else 1
+        self._y_label_canvas.refresh(layout=True)
+        self._x_axis_canvas.refresh(layout=True)
 
     def _on_canvas_resized(self, event: Canvas.Resized) -> None:
         event.stop()
@@ -571,11 +633,13 @@ class Plot(Widget, can_focus=True):
         for canvas in canvases:
             canvas.reset()
         if (viewport := self._viewport()) is not None:
+            y_ticks = self._y_ticks_in_view(viewport)
+            self._fit_y_ticks_column([label for _, label in y_ticks])
             for dataset in self._datasets:
                 dataset.draw(self._canvas, viewport, self._rich_style)
             self._draw_frame(viewport)
             self._draw_x_ticks(viewport)
-            self._draw_y_ticks(viewport)
+            self._draw_y_ticks(viewport, y_ticks)
         self._draw_labels()
         self._legend.show(
             (dataset.legend_marker(), self._style(dataset.style), dataset.label)
@@ -588,6 +652,11 @@ class Plot(Widget, can_focus=True):
     def _style(self, style: str) -> Style:
         if (resolved := self._styles.get(style)) is None:
             resolved = Style.parse(style, self.app.theme_variables)
+            if (colour := resolved.foreground) is not None and colour.a < 1:
+                # A cell's colour has no alpha, so blend it with what is
+                # behind the plot here.
+                _, background = self.background_colors
+                resolved = replace(resolved, foreground=background + colour)
             self._styles[style] = resolved
         return resolved
 
@@ -602,38 +671,75 @@ class Plot(Widget, can_focus=True):
             for x, y, quad in dataset.frame_marks(viewport):
                 self._canvas.add_box(x, y, quad, style)
 
-    def _draw_x_ticks(self, viewport: Viewport) -> None:
+    def _x_ticks_in_view(self, viewport: Viewport) -> list[_XTick]:
+        """The x ticks to draw: as many as `X_TICK_SPACING` allows, fewer
+        where their labels would otherwise come closer than two cells."""
+        if self.x_ticks is not None:
+            ticks = list(self.x_ticks)
+            return self._place_x_ticks(
+                viewport, ticks, self.x_formatter.get_labels(ticks)
+            )
         low, high = viewport.x_range
-        ticks, labels = _ticks_and_labels(self.x_formatter, self.x_ticks, low, high)
-        axis_style = self.get_component_rich_style("plot--axis")
-        tick_style = self.get_component_rich_style("plot--tick")
-        # Labels may reach out under the y axis, so they go on a canvas that
-        # starts further left than the data's.
-        shift = self._canvas.region.x - self._x_axis_canvas.region.x
+        most = max(1, viewport.region.width // self.X_TICK_SPACING)
+        placed: list[_XTick] = []
+        for max_ticks in range(most, 0, -1):
+            ticks, labels = self.x_formatter.get_ticks_and_labels(low, high, max_ticks)
+            placed = self._place_x_ticks(viewport, ticks, labels)
+            if all(b.start - a.end > 2 for a, b in pairwise(placed)):
+                break
+        return placed
+
+    def _place_x_ticks(
+        self, viewport: Viewport, ticks: Sequence[float], labels: Sequence[str]
+    ) -> list[_XTick]:
+        low, high = viewport.x_range
         categorical = isinstance(self.x_formatter, CategoricalFormatter)
-        for tick, label in zip(ticks, labels):
+        placed = []
+        for tick, label in sorted(zip(ticks, labels)):
             if not low <= tick <= high:
                 continue
             x, _ = viewport.to_cell(tick, 0.0)
-            align: Literal["left", "center", "right"] = "center"
+            align: Literal["center", "right"] = "center"
+            # Where `Canvas.write_text` puts the label's first character.
+            start = x - (len(label) - 1) // 2
             if not categorical:
                 # The ends of the range sit on the frame's corners, and a
                 # label at the right end stays inside the plot.
                 if tick == low:
                     x -= 1
+                    start -= 1
                 elif tick == high:
                     align = "right"
-            self._canvas.add_box(x, 0, (2, 0, 0, 0), axis_style)
-            self._canvas.add_box(x, viewport.region.bottom, (0, 0, 2, 0), axis_style)
-            self._x_axis_canvas.write_text(x + shift, 0, label, tick_style, align)
+                    start = x - len(label) + 1
+            placed.append(_XTick(x, label, align, start, start + len(label) - 1))
+        return placed
 
-    def _draw_y_ticks(self, viewport: Viewport) -> None:
-        low, high = viewport.y_range
-        ticks, labels = _ticks_and_labels(self.y_formatter, self.y_ticks, low, high)
+    def _draw_x_ticks(self, viewport: Viewport) -> None:
         axis_style = self.get_component_rich_style("plot--axis")
         tick_style = self.get_component_rich_style("plot--tick")
-        width = self._y_ticks_canvas.size.width
-        shift = self._canvas.region.y - self._y_ticks_canvas.region.y
+        # Labels may reach out under the y axis, so they go on a canvas that
+        # starts further left than the data's.
+        shift = self._canvas.region.x - self._x_axis_canvas.region.x
+        bottom = viewport.region.bottom
+        for tick in self._x_ticks_in_view(viewport):
+            self._canvas.add_box(tick.x, 0, (2, 0, 0, 0), axis_style)
+            self._canvas.add_box(tick.x, bottom, (0, 0, 2, 0), axis_style)
+            self._x_axis_canvas.write_text(
+                tick.x + shift, 0, tick.label, tick_style, tick.align
+            )
+
+    def _y_ticks_in_view(self, viewport: Viewport) -> list[tuple[int, str]]:
+        """The y ticks to draw, one per `Y_TICK_SPACING` rows at most, as
+        (row on the data canvas, label)."""
+        low, high = viewport.y_range
+        if self.y_ticks is not None:
+            ticks = list(self.y_ticks)
+            labels = self.y_formatter.get_labels(ticks)
+        else:
+            ticks, labels = self.y_formatter.get_ticks_and_labels(
+                low, high, max(1, viewport.region.height // self.Y_TICK_SPACING)
+            )
+        rows = []
         for tick, label in zip(ticks, labels):
             if not low <= tick <= high:
                 continue
@@ -641,9 +747,30 @@ class Plot(Widget, can_focus=True):
             if tick == low:
                 # The bottom of the range sits on the frame's corner.
                 y += 1
+            rows.append((y, label))
+        return rows
+
+    def _fit_y_ticks_column(self, labels: Sequence[str]) -> None:
+        """Size the tick labels' column to the widest of them, with a cell
+        either side, for when CSS leaves it `auto`."""
+        width = max(map(len, labels), default=0) + 2
+        if width != self._y_ticks_canvas.content_width:
+            self._y_ticks_canvas.content_width = width
+            # The canvases resize, which draws again at the new size.
+            self._y_ticks_canvas.refresh(layout=True)
+
+    def _draw_y_ticks(
+        self, viewport: Viewport, ticks: Sequence[tuple[int, str]]
+    ) -> None:
+        axis_style = self.get_component_rich_style("plot--axis")
+        tick_style = self.get_component_rich_style("plot--tick")
+        width = self._y_ticks_canvas.size.width
+        shift = self._canvas.region.y - self._y_ticks_canvas.region.y
+        for y, label in ticks:
             self._canvas.add_box(0, y, (0, 0, 0, 2), axis_style)
             self._canvas.add_box(viewport.region.right, y, (0, 2, 0, 0), axis_style)
-            # Cropped to leave a gap before the axis.
+            # Cropped, where CSS makes the column narrower, to leave a gap
+            # before the axis.
             self._y_ticks_canvas.write_text(
                 width - 2, y + shift, label[: width - 1], tick_style, "right"
             )
@@ -862,11 +989,3 @@ def _same_length[T](values: list[T], count: int, name: str) -> list[T]:
     if len(values) != count:
         raise ValueError(f"{name} has {len(values)} values for {count} bars")
     return values
-
-
-def _ticks_and_labels(
-    formatter: AxisFormatter, ticks: Sequence[float] | None, low: float, high: float
-) -> tuple[list[float], list[str]]:
-    if ticks is None:
-        return formatter.get_ticks_and_labels(low, high)
-    return list(ticks), formatter.get_labels(ticks)

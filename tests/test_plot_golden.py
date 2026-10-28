@@ -20,6 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from test_plot import settle
 from textual.app import App, ComposeResult
 
 from tcoda.plot import Plot
@@ -71,13 +72,15 @@ async def test_the_plot_draws_as_recorded(name: str) -> None:
     app = Harness()
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        CASES[name](app.query_one(Plot))
-        await pilot.pause()
-        await pilot.pause()
+        plot = app.query_one(Plot)
+        CASES[name](plot)
+        await settle(pilot, plot)
         actual = screen_text(app)
 
     path = GOLDEN / f"{name}.txt"
     if UPDATE:
         GOLDEN.mkdir(exist_ok=True)
-        path.write_text(actual, encoding="utf-8")
+        # As .gitattributes checks them out, so re-recording on Windows does
+        # not rewrite every line.
+        path.write_text(actual, encoding="utf-8", newline="\n")
     assert actual == path.read_text(encoding="utf-8")

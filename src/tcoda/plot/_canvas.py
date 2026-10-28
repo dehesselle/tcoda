@@ -25,6 +25,7 @@ from rich.segment import Segment
 from rich.style import Style
 from textual import events
 from textual.css.types import AlignHorizontal
+from textual.geometry import Size
 from textual.message import Message
 from textual.strip import Strip
 from textual.widget import Widget
@@ -77,6 +78,16 @@ class Canvas(Widget):
         self._styles: list[list[Style | None]] = []
         #: Box-drawing arms per cell, merged so crossing lines join up.
         self._boxes: dict[tuple[int, int], Quad] = {}
+        #: The size an `auto` width or height takes, which the owner sets
+        #: from what it is about to draw.
+        self.content_width = 0
+        self.content_height = 0
+
+    def get_content_width(self, container: Size, viewport: Size) -> int:
+        return self.content_width
+
+    def get_content_height(self, container: Size, viewport: Size, width: int) -> int:
+        return self.content_height
 
     def _on_resize(self, event: events.Resize) -> None:
         self.reset()

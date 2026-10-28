@@ -20,6 +20,7 @@ import pytest
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
+from textual.pilot import Pilot
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -71,6 +72,18 @@ def scroll_down(widget: Widget, x: int, y: int) -> None:
     )  # fmt: skip
 
 
+async def settle(pilot: Pilot[None], plot: Plot) -> None:
+    """Wait for the plot to finish drawing. A change in how wide its y tick
+    labels are lays it out again, and that draws it a second time."""
+    before = None
+    for _ in range(10):
+        await pilot.pause()
+        now = [canvas._chars for canvas in plot.query(Canvas)]
+        if now == before and not plot._redraw_pending:
+            return
+        before = now
+
+
 @asynccontextmanager
 async def drawn(draw: Callable[[Plot], object]) -> AsyncIterator[Plot]:
     """A freshly mounted plot, drawn on and rendered, while the app still runs."""
@@ -79,7 +92,7 @@ async def drawn(draw: Callable[[Plot], object]) -> AsyncIterator[Plot]:
         plot = app.query_one(Plot)
         await pilot.pause()
         draw(plot)
-        await pilot.pause()
+        await settle(pilot, plot)
         yield plot
 
 
@@ -210,7 +223,8 @@ async def test_an_open_limit_follows_the_data() -> None:
         plot.x_limits = (0, None)
 
     async with drawn(draw) as plot:
-        assert plot.x_range == (0.0, 7.0)
+        # The open end goes a margin past the data, the fixed one stays.
+        assert plot.x_range == pytest.approx((0.0, 7.0 * (1 + Plot.AUTO_MARGIN)))
 
 
 async def test_a_datetime_axis_labels_dates() -> None:
@@ -245,6 +259,115 @@ async def test_a_resize_redraws_at_the_new_size() -> None:
         assert canvas(plot).size.width < before.width
         assert len(canvas(plot)._chars[0]) == canvas(plot).size.width
         assert drawn_cells(plot) > 0
+
+
+async def test_a_lone_point_gets_a_range_around_it() -> None:
+    async with drawn(lambda plot: plot.plot([5], [300])) as plot:
+        assert plot.x_range == (2.5, 7.5)
+        assert plot.y_range == (150.0, 450.0)
+        assert x_labels(plot).split()[0] != x_labels(plot).split()[-1]
+
+
+async def test_a_flat_line_on_a_fixed_floor_keeps_the_floor() -> None:
+    def draw(plot: Plot) -> None:
+        plot.plot([0, 1, 2], [0, 0, 0])
+        plot.y_limits = (0, None)
+
+    async with drawn(draw) as plot:
+        assert plot.y_range == (0.0, 1.0)
+
+
+async def test_an_open_end_without_data_meets_the_fixed_one() -> None:
+    def draw(plot: Plot) -> None:
+        plot.x_limits = (5, None)
+
+    async with drawn(draw) as plot:
+        assert plot.x_range == (5.0, 7.5)
+
+
+async def test_the_extremes_stay_clear_of_the_frame() -> None:
+    async with drawn(lambda plot: plot.plot(XS, SINE)) as plot:
+        rows = canvas(plot)._chars
+        # Nothing is drawn on the frame's top or bottom row but the frame.
+        assert all(char in "━┏┓┗┛┻┳" for char in rows[0] + rows[-1])
+        assert drawn_cells(plot) > 0
+
+
+async def test_x_ticks_thin_out_on_a_narrow_plot() -> None:
+    class Narrow(App[None]):
+        CSS = "Plot { width: 30; }"
+
+        def compose(self) -> ComposeResult:
+            yield Plot()
+
+    def labels_and_gaps(plot: Plot) -> tuple[list[str], list[int]]:
+        row = x_labels(plot)
+        words = row.split()
+        starts = [row.index(word) for word in words]
+        gaps = [b - (a + len(w)) for a, b, w in zip(starts, starts[1:], words)]
+        return words, gaps
+
+    async with drawn(lambda plot: plot.plot([0, 1000], [0, 1])) as plot:
+        wide, _ = labels_and_gaps(plot)
+    app = Narrow()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.plot([0, 1000], [0, 1])
+        await settle(pilot, plot)
+        narrow, gaps = labels_and_gaps(plot)
+    assert 1 < len(narrow) < len(wide)
+    assert min(gaps) >= 2
+
+
+async def test_y_ticks_follow_the_height() -> None:
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.y_limits = (0, 100)
+        await settle(pilot, plot)
+        tall = text_of(plot, "#plot-y-ticks").split()
+        await pilot.resize_terminal(80, 12)
+        await settle(pilot, plot)
+        short = text_of(plot, "#plot-y-ticks").split()
+    assert 1 < len(short) < len(tall)
+
+
+async def test_rows_without_a_label_take_no_room() -> None:
+    def heights(plot: Plot) -> tuple[int, int]:
+        return (
+            plot.query_one("#plot-y-label").size.height,
+            plot.query_one("#plot-x-axis").size.height,
+        )
+
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        await settle(pilot, plot)
+        assert heights(plot) == (0, 1)
+        plot.x_label = "time"
+        plot.y_label = "volts"
+        await settle(pilot, plot)
+        assert heights(plot) == (2, 3)
+
+
+async def test_the_y_tick_column_fits_the_widest_label() -> None:
+    def draw(plot: Plot) -> None:
+        plot.y_limits = (0, 1_000_000)
+
+    async with drawn(draw) as plot:
+        assert plot.query_one("#plot-y-ticks").size.width == len("1000000") + 2
+        lines = text_of(plot, "#plot-y-ticks").splitlines()
+        assert "1000000" in [line.strip() for line in lines]
+
+
+async def test_a_translucent_style_is_blended_with_the_background() -> None:
+    async with drawn(lambda plot: plot.plot([0, 1], [0, 1])) as plot:
+        solid = plot._style("$foreground").foreground
+        faded = plot._style("$foreground 50%").foreground
+        assert faded is not None and faded.a == 1
+        assert faded != solid
+        # The colour a cell gets, which has no alpha to carry it otherwise.
+        assert plot._rich_style("$foreground 50%").color == faded.rich_color
 
 
 # ------------------------------------------------------------ composability
