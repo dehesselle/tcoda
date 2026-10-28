@@ -19,13 +19,14 @@ from typing import ClassVar, get_args
 import pytest
 from textual import events, on
 from textual.app import App, ComposeResult
-from textual.binding import BindingType
+from textual.binding import Binding, BindingType
 from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widget import Widget
 from textual.widgets import Static
 
 from tcoda.plot import (
+    Axes,
     DateTimeFormatter,
     HiResMode,
     LegendLocation,
@@ -33,6 +34,7 @@ from tcoda.plot import (
     Plot,
 )
 from tcoda.plot._canvas import Canvas
+from tcoda.widgets import Footer
 
 SIZE = (80, 24)
 XS = [i / 10 for i in range(100)]
@@ -708,6 +710,75 @@ async def test_without_pan_and_zoom_the_wheel_scrolls_what_is_behind() -> None:
         await pilot.pause()
         assert scroll.scroll_y > 0
         assert plot.x_range == (0.0, 1.0)
+
+
+def footer_row(plot_type: type[Plot], axes: Axes = "xy") -> App[None]:
+    class Footed(App[None]):
+        def compose(self) -> ComposeResult:
+            yield plot_type(pan_and_zoom=axes)
+            yield Footer()
+
+        def on_mount(self) -> None:
+            self.query_one(Plot).focus()
+
+    return Footed()
+
+
+async def rendered_footer(app: App[None]) -> str:
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(pilot, app.query_one(Plot))
+        await pilot.pause()
+        return app.screen._compositor.render_strips()[-1].text
+
+
+@pytest.mark.parametrize(
+    ("axes", "pan"), [("xy", "← → ↑ ↓"), ("x", "← →")], ids=["xy", "x"]
+)
+async def test_the_footer_groups_the_zoom_and_pan_keys(axes: Axes, pan: str) -> None:
+    row = await rendered_footer(footer_row(Plot, axes))
+    assert row.startswith(f" + - Zoom  {pan} Pan  r Reset ")
+
+
+class CompactPlot(Plot):
+    COMPACT_KEY_GROUPS = True
+
+
+class DeeperCompactPlot(CompactPlot):
+    """Inherits the setting without restating it."""
+
+
+class CompactPresets(Plot):
+    """Compact, with keys of its own, one of them a plot key bound to
+    something else."""
+
+    COMPACT_KEY_GROUPS = True
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("1", "preset", "Preset"),
+        Binding("r", "refresh", "Refresh"),
+    ]
+
+
+@pytest.mark.parametrize("plot_type", [CompactPlot, DeeperCompactPlot])
+async def test_a_subclass_can_make_the_key_groups_compact(
+    plot_type: type[Plot],
+) -> None:
+    row = await rendered_footer(footer_row(plot_type))
+    assert row.startswith(" +- Zoom  ←→↑↓ Pan  r Reset ")
+
+
+async def test_compact_key_groups_keep_a_subclasss_own_keys() -> None:
+    row = await rendered_footer(footer_row(CompactPresets))
+    assert " +- Zoom " in row and " ←→↑↓ Pan " in row
+    assert " 1 Preset " in row and " r Refresh " in row
+    assert "Reset" not in row
+
+
+def test_a_subclass_that_inherits_no_bindings_gets_none_back() -> None:
+    class Bare(Plot, inherit_bindings=False):
+        COMPACT_KEY_GROUPS = True
+
+    assert "BINDINGS" not in Bare.__dict__
+    assert not Bare._merged_bindings.key_to_bindings  # type: ignore[union-attr]
 
 
 async def test_without_pan_and_zoom_the_keys_leave_the_footer() -> None:

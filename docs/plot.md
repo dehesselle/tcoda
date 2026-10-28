@@ -121,7 +121,10 @@ class MyApp(App[None]):
   A drag captures the mouse, so it carries on past the edge of the plot.
 - **The keys** are `+`/`-` (zoom), `ctrl+=`/`ctrl+-` for the x axis only,
   `ctrl+shift+=`/`ctrl+shift+-` for the y axis only, the arrow keys (pan)
-  and `r` (reset). Each binding has an id (`plot.zoom_in`, `plot.pan_left`,
+  and `r` (reset). In a footer they take two items, `+ - Zoom` and
+  `← → ↑ ↓ Pan`, as `Binding.Group`s. `COMPACT_KEY_GROUPS = True` on a
+  subclass runs their keys together (`+- Zoom`, `←→↑↓ Pan`); it is off by
+  default, as for any `Binding.Group`. Each binding has an id (`plot.zoom_in`, `plot.pan_left`,
   ..., `plot.reset_range`), so an app's keymap (`App.set_keymap`) can move it
   to another key. A subclass that wants an action gone altogether returns
   False for it from `check_action`.

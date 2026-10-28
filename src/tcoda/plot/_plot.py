@@ -19,12 +19,12 @@ from dataclasses import replace
 from itertools import pairwise
 from math import isfinite
 from numbers import Real
-from typing import ClassVar, Literal, NamedTuple, get_args
+from typing import Any, ClassVar, Literal, NamedTuple, get_args
 
 from rich.style import Style as RichStyle
 from textual import events
 from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding, BindingsMap, BindingType
 from textual.containers import Container
 from textual.content import Content
 from textual.errors import NoWidget
@@ -56,8 +56,48 @@ type Limits = tuple[float | None, float | None]
 _HIRES_MODES: tuple[HiResMode, ...] = get_args(HiResMode.__value__)
 _LEGEND_LOCATIONS: tuple[LegendLocation, ...] = get_args(LegendLocation.__value__)
 
-_ZOOM = Binding.Group("Zoom")
-_PAN = Binding.Group("Pan")
+
+def _view_bindings(*, compact: bool) -> list[BindingType]:
+    """The keys that zoom, pan and reset, with their footer groups compact or
+    not."""
+    zoom = Binding.Group("Zoom", compact=compact)
+    pan = Binding.Group("Pan", compact=compact)
+    return [
+        # Each has an id, so an app's keymap can move it to another key.
+        Binding("plus", "zoom_in", "Zoom in", group=zoom, id="plot.zoom_in"),
+        Binding("minus", "zoom_out", "Zoom out", group=zoom, id="plot.zoom_out"),
+        Binding(
+            "ctrl+equals_sign",
+            "zoom_x_in",
+            "Zoom x in",
+            show=False,
+            id="plot.zoom_x_in",
+        ),
+        Binding(
+            "ctrl+minus", "zoom_x_out", "Zoom x out", show=False, id="plot.zoom_x_out"
+        ),
+        Binding(
+            "ctrl+shift+equals_sign",
+            "zoom_y_in",
+            "Zoom y in",
+            show=False,
+            id="plot.zoom_y_in",
+        ),
+        Binding(
+            "ctrl+shift+minus",
+            "zoom_y_out",
+            "Zoom y out",
+            show=False,
+            id="plot.zoom_y_out",
+        ),
+        Binding("left", "pan_left", "Pan left", group=pan, id="plot.pan_left"),
+        Binding("right", "pan_right", "Pan right", group=pan, id="plot.pan_right"),
+        Binding("up", "pan_up", "Pan up", group=pan, id="plot.pan_up"),
+        Binding("down", "pan_down", "Pan down", group=pan, id="plot.pan_down"),
+        Binding("r", "reset_range", "Reset", id="plot.reset_range"),
+    ]
+
+
 #: The axes zooming and panning move: both, or just one.
 type Axes = Literal["xy", "x", "y"]
 _AXES: tuple[Axes, ...] = get_args(Axes.__value__)
@@ -181,40 +221,11 @@ class Plot(Widget, can_focus=True):
     }
     """
 
-    BINDINGS: ClassVar[list[BindingType]] = [
-        # Each has an id, so an app's keymap can move it to another key.
-        Binding("plus", "zoom_in", "Zoom in", group=_ZOOM, id="plot.zoom_in"),
-        Binding("minus", "zoom_out", "Zoom out", group=_ZOOM, id="plot.zoom_out"),
-        Binding(
-            "ctrl+equals_sign",
-            "zoom_x_in",
-            "Zoom x in",
-            show=False,
-            id="plot.zoom_x_in",
-        ),
-        Binding(
-            "ctrl+minus", "zoom_x_out", "Zoom x out", show=False, id="plot.zoom_x_out"
-        ),
-        Binding(
-            "ctrl+shift+equals_sign",
-            "zoom_y_in",
-            "Zoom y in",
-            show=False,
-            id="plot.zoom_y_in",
-        ),
-        Binding(
-            "ctrl+shift+minus",
-            "zoom_y_out",
-            "Zoom y out",
-            show=False,
-            id="plot.zoom_y_out",
-        ),
-        Binding("left", "pan_left", "Pan left", group=_PAN, id="plot.pan_left"),
-        Binding("right", "pan_right", "Pan right", group=_PAN, id="plot.pan_right"),
-        Binding("up", "pan_up", "Pan up", group=_PAN, id="plot.pan_up"),
-        Binding("down", "pan_down", "Pan down", group=_PAN, id="plot.pan_down"),
-        Binding("r", "reset_range", "Reset", id="plot.reset_range"),
-    ]
+    BINDINGS: ClassVar[list[BindingType]] = _view_bindings(compact=False)
+    #: Whether the zoom and pan keys run together in a footer (`+- Zoom`)
+    #: rather than a cell apart (`+ - Zoom`): `Binding.Group.compact` for
+    #: both groups. Set it on a subclass.
+    COMPACT_KEY_GROUPS: ClassVar[bool] = False
 
     #: How much one notch of the wheel zooms.
     MOUSE_ZOOM_FACTOR: ClassVar[float] = 0.05
@@ -271,6 +282,23 @@ class Plot(Widget, can_focus=True):
     y_span: var[Limits] = var((None, None), init=False)
     #: Whether scrolling down zooms out instead of in.
     invert_mouse_wheel: var[bool] = var(False, init=False)
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if "COMPACT_KEY_GROUPS" in cls.__dict__ and kwargs.get(
+            "inherit_bindings", True
+        ):
+            # Textual merges bindings once, when a class is made, so the ones
+            # this class would inherit are declared on it again with the
+            # groups it asks for. A key it binds itself stays its own, and a
+            # class that inherits no bindings gets none back.
+            own = list(cls.__dict__.get("BINDINGS", []))
+            taken = BindingsMap(own).key_to_bindings.keys()
+            cls.BINDINGS = [
+                binding
+                for binding in _view_bindings(compact=cls.COMPACT_KEY_GROUPS)
+                if isinstance(binding, Binding) and binding.key not in taken
+            ] + own
+        super().__init_subclass__(**kwargs)
 
     def __init__(
         self,
