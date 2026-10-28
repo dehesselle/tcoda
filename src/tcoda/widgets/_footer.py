@@ -36,6 +36,7 @@ import re
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
+from itertools import groupby
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from rich.text import Text
@@ -45,7 +46,7 @@ from textual.containers import HorizontalGroup, HorizontalScroll
 from textual.dom import DOMNode, NoScreen
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import Label, Static
 
 from tcoda.chords import ChordMixin, Steps
 
@@ -211,6 +212,25 @@ class FooterBinding(Widget):
         self.set_class(compact, "-compact")
 
 
+class FooterGroup(HorizontalGroup):
+    """Bindings that share a `Binding.Group`: a `FooterBinding` per key, with
+    no description of its own, then the group's description once after them.
+
+    Textual's own footer does the same with its `KeyGroup`; the name differs
+    for the reason `FooterBinding`'s does.
+    """
+
+    DEFAULT_CSS = """
+    FooterGroup {
+        width: auto;
+    }
+    """
+
+
+class FooterGroupLabel(Label):
+    """The description after a group's keys, as Textual's `FooterLabel`."""
+
+
 class FooterStatus(HorizontalGroup):
     """The footer's status corner: the app's own widgets, plus a text label."""
 
@@ -316,6 +336,26 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
        costs one column and no rows, which is what makes it usable here. */
     Footer > .-divider {
         border-left: vkey $foreground 20%;
+    }
+    /* Groups, spaced as Textual's own footer spaces them: a cell either
+       side of each key, none between the keys of a compact group. */
+    Footer FooterBinding.-grouped {
+        margin: 0 1;
+    }
+    Footer FooterGroup.-compact {
+        margin: 0 1 0 0;
+        padding-left: 1;
+        & > FooterBinding.-grouped {
+            margin: 0;
+        }
+    }
+    Footer FooterGroupLabel {
+        margin: 0 1 0 0;
+        color: $footer-description-foreground;
+        background: $footer-description-background;
+    }
+    Footer.-compact FooterGroupLabel {
+        margin: 0;
     }
     Footer > #footer-status > * {
         width: auto;
@@ -477,13 +517,44 @@ class Footer(Widget, can_focus=False, can_focus_children=False):
             await self._pinned_area.remove_children()
             await self._keys_area.remove_children()
             await self._pinned_area.mount_all(self._render_keys(pinned))
-            await self._keys_area.mount_all(self._render_keys(dynamic))
+            # Pins are named one binding at a time, so only the rest group.
+            await self._keys_area.mount_all(self._render_keys(dynamic, grouped=True))
         self._sync_dividers()
 
-    def _render_keys(self, entries: Iterable[FooterEntry]) -> list[FooterBinding]:
-        return [
-            FooterBinding(entry).data_bind(compact=Footer.compact) for entry in entries
-        ]
+    def _render_keys(
+        self, entries: Iterable[FooterEntry], *, grouped: bool = False
+    ) -> list[Widget]:
+        """A `FooterBinding` per entry; with `grouped`, neighbours that share a
+        `Binding.Group` become a `FooterGroup` instead, as in Textual's footer.
+        A group of one is just its binding, under its own description."""
+        widgets: list[Widget] = []
+        for group, members in groupby(
+            entries, key=lambda entry: entry.binding.group if grouped else None
+        ):
+            run = list(members)
+            if group is None or len(run) == 1:
+                widgets.extend(self._render_key(entry) for entry in run)
+                continue
+            keys = []
+            for entry in run:
+                # The key alone; its own description is what hovering shows.
+                key = self._render_key(
+                    replace(
+                        entry,
+                        description="",
+                        tooltip=entry.tooltip or entry.description,
+                    )
+                )
+                key.add_class("-grouped")
+                keys.append(key)
+            widgets.append(
+                FooterGroup(*keys, classes="-compact" if group.compact else "")
+            )
+            widgets.append(FooterGroupLabel(group.description))
+        return widgets
+
+    def _render_key(self, entry: FooterEntry) -> FooterBinding:
+        return FooterBinding(entry).data_bind(compact=Footer.compact)
 
     def _sync_dividers(self) -> None:
         # "Draw a rule on my left edge if anything is already showing to my

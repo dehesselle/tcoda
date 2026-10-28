@@ -29,6 +29,8 @@ from tcoda.widgets._footer import (
     Footer,
     FooterBinding,
     FooterEntry,
+    FooterGroup,
+    FooterGroupLabel,
     FooterStatus,
     sort_by_key,
 )
@@ -49,6 +51,8 @@ __all__ = [
     "Footer",
     "FooterBinding",
     "FooterEntry",
+    "FooterGroup",
+    "FooterGroupLabel",
     "FooterStatus",
     "Header",
     "HeaderArea",

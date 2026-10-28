@@ -15,7 +15,13 @@ from textual.pilot import Pilot
 from textual.screen import Screen
 from textual.widgets import Static
 
-from tcoda.widgets import Countdown, Footer, FooterBinding
+from tcoda.widgets import (
+    Countdown,
+    Footer,
+    FooterBinding,
+    FooterGroup,
+    FooterGroupLabel,
+)
 
 
 class Body(Static, can_focus=True):
@@ -102,6 +108,47 @@ def area_text(footer: Footer, area: str = "#footer-keys") -> list[str]:
     return [widget.description for widget in footer.query(f"{area} FooterBinding")]
 
 
+class Grouped(Harness):
+    """Bindings in groups: one compact, one not, a group of one, and a group
+    whose bindings are not neighbours. Each binding names its own
+    `Binding.Group`, as separate widgets would."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("a", "earlier", "Earlier", group=Binding.Group("Span", compact=True)),
+        Binding("b", "later", "Later", group=Binding.Group("Span", compact=True)),
+        Binding("j", "down", "Down", group=Binding.Group("Step")),
+        Binding("k", "up", "Up", group=Binding.Group("Step")),
+        Binding("g", "solo", "Only one", group=Binding.Group("Solo")),
+        Binding("m", "apart", "Apart", group=Binding.Group("Split")),
+        Binding("n", "between", "Between"),
+        Binding("o", "away", "Away", group=Binding.Group("Split")),
+    ]
+
+    def action_earlier(self) -> None:
+        self.fired.append("earlier")
+
+    def action_later(self) -> None:
+        self.fired.append("later")
+
+
+def footer_row(app: App[None]) -> str:
+    """The footer as it reads on screen."""
+    return app.screen._compositor.render_strips()[-1].text
+
+
+def group_keys(footer: Footer) -> dict[str, list[str]]:
+    """Each group's description, and the keys shown before it."""
+    groups = {}
+    for group in footer.query(FooterGroup):
+        siblings = list(group.parent.children)
+        description = siblings[siblings.index(group) + 1]
+        assert isinstance(description, FooterGroupLabel)
+        groups[str(description.content)] = [
+            key.key_display for key in group.query(FooterBinding)
+        ]
+    return groups
+
+
 # --------------------------------------------------------------- stock parity
 
 
@@ -174,6 +221,76 @@ async def test_focusing_a_widget_brings_its_own_bindings_in() -> None:
         app.query_one(Body).focus()
         await settle(pilot)
         assert "Reload" in area_text(footer)
+
+
+# ------------------------------------------------------------------- groups
+
+
+async def test_a_group_shows_its_keys_then_its_description_as_textual_does() -> None:
+    app = Grouped()
+    # Wide enough for every key, so none scrolls out of view.
+    async with app.run_test(size=(160, 10)) as pilot:
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        assert group_keys(footer) == {"Span": ["a", "b"], "Step": ["j", "k"]}
+        # Textual's spacing: a compact group runs its keys together, any
+        # other puts a cell either side of each.
+        assert " ab Span " in footer_row(app)
+        assert " j k Step " in footer_row(app)
+
+
+async def test_a_grouped_key_has_no_description_but_shows_it_on_hover() -> None:
+    app = Grouped()
+    async with app.run_test() as pilot:
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        keys = {key.key: key for key in footer.query("FooterGroup FooterBinding")}
+        assert keys["a"].description == ""
+        assert keys["a"].tooltip == "Earlier"
+        assert keys["a"].has_class("-grouped")
+
+
+async def test_a_group_of_one_is_just_its_binding() -> None:
+    app = Grouped()
+    async with app.run_test() as pilot:
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        assert "Only one" in area_text(footer)
+        assert "Solo" not in group_keys(footer)
+
+
+async def test_only_neighbours_group() -> None:
+    app = Grouped()
+    async with app.run_test() as pilot:
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        assert "Split" not in group_keys(footer)
+        assert {"Apart", "Between", "Away"} <= set(area_text(footer))
+
+
+async def test_each_key_in_a_group_runs_its_own_action() -> None:
+    app = Grouped()
+    async with app.run_test() as pilot:
+        await settle(pilot)
+        keys = {
+            key.key: key
+            for key in app.query_one(Footer).query("FooterGroup FooterBinding")
+        }
+        await pilot.click(keys["b"])
+        await pilot.click(keys["a"])
+        await settle(pilot)
+        assert app.fired == ["later", "earlier"]
+
+
+async def test_a_pinned_binding_leaves_its_group() -> None:
+    app = Grouped(pinned=("a",))
+    async with app.run_test() as pilot:
+        await settle(pilot)
+        footer = app.query_one(Footer)
+        assert area_text(footer, "#footer-pinned") == ["Earlier"]
+        # What is left of the group is a group of one.
+        assert "Later" in area_text(footer)
+        assert "Span" not in group_keys(footer)
 
 
 # ----------------------------------------------------------------- pinned area

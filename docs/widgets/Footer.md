@@ -44,7 +44,16 @@ class MainScreen(Screen):
   off". See [DESIGN.md](../DESIGN.md#hide-with-display-never-with-an-empty-render).
 - **Dividers appear only between areas that both have content**, drawn with
   Textual's own `border-left: vkey` rather than a character.
-- **`Binding.Group` is ignored**; grouped bindings render as individual keys.
+- **`Binding.Group` works as in Textual's own footer.** Neighbouring
+  bindings with the same group show their keys, then the group's description
+  once: `+- Zoom`. A `compact` group runs its keys together, any other puts a
+  cell either side of each, with Textual's spacing. Each key is still its own
+  `FooterBinding`, so it is clicked and dimmed on its own and shows its
+  binding's description on hover. A group of one is just its binding, and
+  bindings that are not neighbours do not group, as in Textual. With
+  `sort=`, the order after sorting is what decides who is a neighbour.
+- **A pinned binding leaves its group.** Pins are named one binding at a
+  time, so only the unpinned keys group.
 - **A pending [chord](../chords.md) shows in the status corner**, beside the
   app's own `status.update(...)` text rather than in place of it, and chord
   keys display step by step (`^k ^s`). Clicking one runs it. A
@@ -60,4 +69,7 @@ Also exported, for customising rather than everyday use:
   `footer-binding--key` and `footer-binding--description` component classes.
   Deliberately not named `FooterKey`: an app that also mounts a stock `Footer`
   would have that footer's `FooterKey` CSS match ours.
+- **`FooterGroup`** and **`FooterGroupLabel`** — a group's keys and its
+  description, Textual's `KeyGroup` and `FooterLabel` under names of their
+  own for the same reason. The keys in a group carry the class `-grouped`.
 - **`FooterStatus`** — the status corner, reached as `footer.status`.
