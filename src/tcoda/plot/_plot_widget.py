@@ -506,16 +506,20 @@ class PlotWidget(Widget, can_focus=True):
                 marker. Defaults to None.
             label: A string with the label for the dataset. Defaults to None.
         """
-        x, y = drop_nans_and_infs(x, y)
-
-        # Convert error values to lists of floats if provided
-        xerr_list = [float(v) for v in xerr] if xerr is not None else [0.0] * len(x)
-        yerr_list = [float(v) for v in yerr] if yerr is not None else [0.0] * len(y)
+        x_values = list(x)
+        zeros = [0.0] * len(x_values)
+        # Drop errors together with their data points to keep them aligned
+        x_list, y_list, xerr_list, yerr_list = drop_nans_and_infs(
+            x_values,
+            y,
+            xerr if xerr is not None else zeros,
+            yerr if yerr is not None else zeros,
+        )
 
         self._datasets.append(
             ErrorBarPlot(
-                x=x,
-                y=y,
+                x=x_list,
+                y=y_list,
                 xerr=xerr_list,
                 yerr=yerr_list,
                 marker=marker,
@@ -1773,24 +1777,29 @@ def linear_mapper(
 
 
 def drop_nans_and_infs(
-    x: Iterable[float], y: Iterable[float]
-) -> tuple[list[float], list[float]]:
-    """Drop NaNs and Infs from x and y values.
+    x: Iterable[float], y: Iterable[float], *others: Iterable[float]
+) -> tuple[list[float], ...]:
+    """Drop data points where x or y is NaN or Inf.
+
+    Additional iterables (e.g. error values) are filtered along with x and y,
+    so they stay aligned with their data points. Their own values are not
+    checked.
 
     Args:
         x: An iterable with the data values for the horizontal axis.
         y: An iterable with the data values for the vertical axis.
+        others: Iterables with values belonging to each data point.
 
     Returns:
-        A tuple of lists of floats with NaNs and Infs removed.
+        A tuple of lists of floats (x, y, then others) with the data points
+        containing NaNs and Infs removed.
 
     Raises:
-        ValueError: If x and y have different lengths.
+        ValueError: If the iterables have different lengths.
     """
-    x_list: list[float] = []
-    y_list: list[float] = []
-    for xi, yi in zip(x, y, strict=True):
-        if isfinite(xi) and isfinite(yi):
-            x_list.append(float(xi))
-            y_list.append(float(yi))
-    return x_list, y_list
+    columns: tuple[list[float], ...] = tuple([] for _ in range(2 + len(others)))
+    for values in zip(x, y, *others, strict=True):
+        if isfinite(values[0]) and isfinite(values[1]):
+            for column, value in zip(columns, values):
+                column.append(float(value))
+    return columns

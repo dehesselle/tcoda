@@ -91,6 +91,30 @@ async def test_an_errorbar_plot_draws(mode: HiResMode | None) -> None:
         assert drawn_cells(plot) > 0
 
 
+async def test_errors_are_dropped_along_with_their_nan_points() -> None:
+    """The big error belongs to the dropped point; it must not slide onto
+    the next one."""
+
+    def canvas(plot: PlotWidget) -> list[list[str]]:
+        return plot.query_one("#plot", Canvas)._buffer
+
+    def with_nan(plot: PlotWidget) -> None:
+        plot.errorbar([1, math.nan, 3, 5], [1, 1, 2, 1], yerr=[0.1, 5, 0.1, 0.1])
+        plot.set_xlimits(0, 6)
+        plot.set_ylimits(-5, 8)
+
+    def without(plot: PlotWidget) -> None:
+        plot.errorbar([1, 3, 5], [1, 2, 1], yerr=[0.1, 0.1, 0.1])
+        plot.set_xlimits(0, 6)
+        plot.set_ylimits(-5, 8)
+
+    async with drawn(with_nan) as plot:
+        actual = canvas(plot)
+    async with drawn(without) as plot:
+        expected = canvas(plot)
+    assert actual == expected
+
+
 async def test_categorical_bars_label_the_x_axis() -> None:
     async with drawn(
         lambda plot: plot.bar(["red", "green", "blue"], [1, 3, 2])
