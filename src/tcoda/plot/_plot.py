@@ -528,7 +528,7 @@ class Plot(Widget, can_focus=True):
                 low, high = formatter.around(low)
             return float(low), float(high)
 
-        values = [v for dataset in self._datasets for v in dataset.extent()[axis]]
+        values = self._extent(axis)
         fixed_low, fixed_high = limits
         followed = bool(values)
         if not values:
@@ -561,6 +561,18 @@ class Plot(Widget, can_focus=True):
             if fixed_high is None:
                 high += margin
         return float(low), float(high)
+
+    def _extent(self, axis: int) -> list[float]:
+        """The values an end of the axis that follows the data follows.
+
+        For y, those of the data in the x range shown, so zooming in on x
+        fits y to what is left; or all of it, while none is in view.
+        """
+        if axis == 0:
+            return [x for dataset in self._datasets for x in dataset.extent()[0]]
+        x_range = self.x_range
+        in_view = [y for dataset in self._datasets for y in dataset.extent(x_range)[1]]
+        return in_view or [y for dataset in self._datasets for y in dataset.extent()[1]]
 
     def validate_x_limits(self, limits: Limits) -> Limits:
         low, high = limits

@@ -370,6 +370,67 @@ async def test_a_translucent_style_is_blended_with_the_background() -> None:
         assert plot._rich_style("$foreground 50%").color == faded.rich_color
 
 
+async def test_y_follows_the_data_in_the_x_range_shown() -> None:
+    def draw(plot: Plot) -> None:
+        plot.plot(list(range(11)), list(range(11)))
+        plot.x_limits = (0, 2)
+
+    async with drawn(draw) as plot:
+        margin = 2 * Plot.AUTO_MARGIN
+        assert plot.y_range == pytest.approx((-margin, 2 + margin))
+
+
+async def test_y_follows_x_as_it_is_zoomed() -> None:
+    app = Harness()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.plot(XS, [x * x for x in XS])
+        plot.focus()
+        await settle(pilot, plot)
+        before = plot.y_range
+        await pilot.press("ctrl+equals_sign", "ctrl+equals_sign")
+        await settle(pilot, plot)
+        assert plot.y_range[1] < before[1]
+
+
+async def test_with_nothing_in_view_y_follows_all_the_data() -> None:
+    def draw(plot: Plot) -> None:
+        plot.scatter([0, 10], [0, 1])
+        plot.x_limits = (4, 6)
+
+    async with drawn(draw) as plot:
+        margin = Plot.AUTO_MARGIN
+        assert plot.y_range == pytest.approx((-margin, 1 + margin))
+
+
+async def test_a_bar_partly_in_view_counts() -> None:
+    def draw(plot: Plot) -> None:
+        plot.bar([1, 2, 3], [5, 1, 9], width=1)
+        plot.x_limits = (2.6, 3.5)
+
+    async with drawn(draw) as plot:
+        assert plot.y_range[1] > 9
+
+
+async def test_a_fixed_y_end_is_not_fitted() -> None:
+    def draw(plot: Plot) -> None:
+        plot.plot(list(range(11)), list(range(11)))
+        plot.x_limits = (0, 2)
+        plot.y_limits = (None, 10)
+
+    async with drawn(draw) as plot:
+        assert plot.y_range == pytest.approx((-Plot.AUTO_MARGIN * 10, 10))
+
+
+async def test_error_bars_are_inside_the_range() -> None:
+    async with drawn(
+        lambda plot: plot.errorbar([1, 2], [1, 2], xerr=[0.5, 0.5], yerr=[1, 1])
+    ) as plot:
+        (x_low, x_high), (y_low, y_high) = plot.x_range, plot.y_range
+        assert x_low < 0.5 and x_high > 2.5
+        assert y_low < 0 and y_high > 3
+
+
 # ------------------------------------------------------------ composability
 
 

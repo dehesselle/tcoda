@@ -44,6 +44,10 @@ class MyApp(App[None]):
 - **`x_limits` is `(low, high)`, with None for an end that follows the data.**
   It is what the axis shows until the user zooms or pans. `x_range` is what it
   shows now, and `reset_range` (`r`) goes back to the limits.
+- **A y end that follows the data follows the data in view**: the points
+  inside `x_range`, or, for bars, those that reach into it. So narrowing x,
+  by limits or by zooming, fits y to what is left. With nothing in view, y
+  follows all the data. Error bars count up to their ends.
 - **`x_ticks` set to None lets the formatter choose, and `[]` shows none.**
 - **Labels are plain text, never markup**, so `"Voltage [mV]"` reads as written.
 - **Formatters** choose ticks and label them: `NumericFormatter` (the

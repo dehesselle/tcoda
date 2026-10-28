@@ -21,7 +21,7 @@ from rich.style import Style
 
 from tcoda.plot._canvas import Canvas, Quad
 from tcoda.plot._hires import HiResMode
-from tcoda.plot._viewport import Viewport
+from tcoda.plot._viewport import Range, Viewport
 
 #: Turns a dataset's style, which may name theme variables, into one to draw.
 type Paint = Callable[[str], Style]
@@ -52,8 +52,13 @@ class Dataset(ABC):
     hires_mode: HiResMode | None = None
 
     @abstractmethod
-    def extent(self) -> tuple[Sequence[float], Sequence[float]]:
-        """The x and y values an automatic range has to include."""
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        """The x and y values an automatic range has to include.
+
+        With `x_range`, the y values are only those of what lies in it.
+        """
 
     @abstractmethod
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
@@ -73,8 +78,10 @@ class Line(Dataset):
     x: list[float]
     y: list[float]
 
-    def extent(self) -> tuple[Sequence[float], Sequence[float]]:
-        return self.x, self.y
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        return self.x, [y for x, y in zip(self.x, self.y) if _within(x, x_range)]
 
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
         style = paint(self.style)
@@ -97,8 +104,10 @@ class Scatter(Dataset):
     #: The character drawn at each point; high-resolution modes draw a dot.
     marker: str = "o"
 
-    def extent(self) -> tuple[Sequence[float], Sequence[float]]:
-        return self.x, self.y
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        return self.x, [y for x, y in zip(self.x, self.y) if _within(x, x_range)]
 
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
         style = paint(self.style)
@@ -122,6 +131,17 @@ class ErrorBars(Scatter):
     yerr: list[float]
     #: None marks each point with ┼ where both bars are drawn, · otherwise.
     marker: str | None = None  # type: ignore[assignment]
+
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        """The points and the ends of their bars."""
+        xs, ys = [], []
+        for x, y, xerr, yerr in zip(self.x, self.y, self.xerr, self.yerr):
+            xs.extend(_spread(x, xerr))
+            if _within(x, x_range):
+                ys.extend(_spread(y, yerr))
+        return xs, ys
 
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
         """Draw the bars at half-cell resolution, then the points on top.
@@ -178,10 +198,18 @@ class Bars(Dataset):
     #: A style per bar, overriding `style`, which the legend shows.
     bar_styles: list[str] | None = None
 
-    def extent(self) -> tuple[Sequence[float], Sequence[float]]:
-        left = [x - width / 2 for x, width in zip(self.x, self.width)]
-        right = [x + width / 2 for x, width in zip(self.x, self.width)]
-        return left + right, [0.0] * len(self.y) + self.y
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        """Both sides of every bar; 0 and the height of every bar any part
+        of which is in `x_range`."""
+        xs, ys = [], []
+        for x, y, width in zip(self.x, self.y, self.width):
+            left, right = x - width / 2, x + width / 2
+            xs += [left, right]
+            if x_range is None or (left <= x_range[1] and right >= x_range[0]):
+                ys += [0.0, y]
+        return xs, ys
 
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
         styles = self.bar_styles or [self.style] * len(self.x)
@@ -213,7 +241,9 @@ class VLine(Dataset):
 
     x: float
 
-    def extent(self) -> tuple[Sequence[float], Sequence[float]]:
+    def extent(
+        self, x_range: Range | None = None
+    ) -> tuple[Sequence[float], Sequence[float]]:
         return [self.x], []
 
     def draw(self, canvas: Canvas, viewport: Viewport, paint: Paint) -> None:
@@ -230,6 +260,15 @@ class VLine(Dataset):
         column, _ = viewport.to_cell(self.x, 0.0)
         yield column, 0, (0, 0, 2, 0)
         yield column, viewport.region.bottom, (2, 0, 0, 0)
+
+
+def _within(x: float, x_range: Range | None) -> bool:
+    return x_range is None or x_range[0] <= x <= x_range[1]
+
+
+def _spread(value: float, error: float) -> tuple[float, ...]:
+    """Where a point's error bar ends, or just the point without one."""
+    return (value - error, value + error) if isfinite(error) else (value,)
 
 
 def _bar_lengths(length: float) -> tuple[bool, int, bool]:
