@@ -60,8 +60,15 @@ class TimelineDialog(Dialog[None]):
             yield Label(f"Timeline of {self._title}", id="title")
             plot = Plot(y_label="KiB", pan_and_zoom="x")
             plot.x_formatter = DateTimeFormatter()
-            plot.x_bounds = (0, time.time())
+            now = time.time()
+            plot.x_bounds = (0, now)
             plot.x_span = (SHORTEST_SPAN, None)
+            times = [info.modified for info in self._files]
+            if times and max(times) - min(times) < SHORTEST_SPAN:
+                # Files changed moments apart, as in a fresh checkout, would
+                # open narrower than zooming in may ever go.
+                high = min((min(times) + max(times) + SHORTEST_SPAN) / 2, now)
+                plot.x_limits = (high - SHORTEST_SPAN, high)
             plot.y_limits = (0, None)
             plot.scatter(
                 [info.modified for info in self._files],

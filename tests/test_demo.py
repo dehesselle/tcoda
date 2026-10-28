@@ -6,6 +6,9 @@
 
 from __future__ import annotations
 
+import time
+from dataclasses import replace
+
 import pytest
 from textual.widgets import Label, Tree
 
@@ -16,7 +19,7 @@ from tcoda.demo._browser import FileTable, format_age, format_size
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
 from tcoda.demo._sizes import SizesDialog, sizes_by_extension
-from tcoda.demo._timeline import TimelineDialog
+from tcoda.demo._timeline import SHORTEST_SPAN, TimelineDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
 from tcoda.plot import Plot
 from tcoda.settings import config
@@ -140,7 +143,14 @@ async def test_the_timeline_counts_the_files_in_view_once_zooming_stops() -> Non
     app = DemoApp()
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
-        total = len(app.screen._files)
+        screen = app.screen
+        # A fresh checkout gives every file about the same mtime, too close
+        # together to zoom into; spread them an hour apart.
+        screen._files = [
+            replace(info, modified=info.modified - i * 3600)
+            for i, info in enumerate(screen._files)
+        ]
+        total = len(screen._files)
         await pilot.press("ctrl+k", "d", "t")
         await pilot.pause()
         assert isinstance(app.screen, TimelineDialog)
@@ -156,6 +166,34 @@ async def test_the_timeline_counts_the_files_in_view_once_zooming_stops() -> Non
         assert high - low < before[1] - before[0]
         in_view = sum(low <= info.modified <= high for info in app.screen._files)
         assert str(status.content) == f"{in_view} of {total} files in view"
+
+
+async def test_the_timeline_opens_no_narrower_than_it_zooms() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        now = time.time()
+        screen._files = [
+            replace(info, modified=now - 5 + i % 3)
+            for i, info in enumerate(screen._files)
+        ]
+        total = len(screen._files)
+        await pilot.press("ctrl+k", "d", "t")
+        await pilot.pause()
+        assert isinstance(app.screen, TimelineDialog)
+        plot = app.screen.query_one(Plot)
+        low, high = plot.x_range
+        assert high - low == pytest.approx(SHORTEST_SPAN)
+        assert high <= time.time()
+        status = app.screen.query_one("#timeline-status", Label)
+        assert str(status.content) == f"{total} of {total} files in view"
+
+        # At the floor already, so zooming in leaves it be.
+        plot.focus()
+        await pilot.press("plus")
+        await pilot.pause()
+        assert plot.x_range == (low, high)
 
 
 async def test_the_timeline_reads_out_the_point_under_the_pointer() -> None:
