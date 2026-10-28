@@ -10,13 +10,14 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widgets import Static
 
 from tcoda.dialogs import AboutDialog
-from tcoda.widgets import AboutMenuItem, Menu, MenuBar
+from tcoda.widgets import AboutMenuItem, Menu, MenuBar, MenuItem
 
 # The only literal prose in the bundled header -- the "tcoda" above it is
 # ASCII art, which spells the name without containing the string.
@@ -161,3 +162,28 @@ async def test_the_menu_item_passes_variables_through(tmp_path) -> None:
         await settle(pilot)
         header = app.screen.query_one("#about-header", Static)
         assert "myapp" in str(header.render())
+
+
+async def test_the_menu_item_still_reaches_the_app_and_closes_the_bar() -> None:
+    class MenuHarness(App[None]):
+        def __init__(self) -> None:
+            super().__init__()
+            self.pressed: list[str] = []
+
+        def compose(self) -> ComposeResult:
+            with MenuBar(), Menu("Help", id="help"):
+                yield AboutMenuItem()
+
+        @on(MenuItem.Pressed)
+        def _record(self, event: MenuItem.Pressed) -> None:
+            self.pressed.append(event.item.id or "")
+
+    app = MenuHarness()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9", "enter")
+        await settle(pilot)
+        await pilot.press("a")
+        await settle(pilot)
+        assert isinstance(app.screen, AboutDialog)
+        assert app.pressed == ["about"]
+        assert not app.query_one(MenuBar).revealed

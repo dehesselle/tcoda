@@ -37,7 +37,7 @@ from tcoda.widgets._footer import (
 from tcoda.widgets._header import Header, HeaderArea
 from tcoda.widgets._log_viewer import TOGGLE_ACTION, LogViewer
 from tcoda.widgets._menubar import OPEN_ACTION, MenuBar
-from tcoda.widgets._menuitem import Menu, MenuAction, MenuEntry, MenuItem, MenuSeparator
+from tcoda.widgets._menuitem import Menu, MenuEntry, MenuItem, MenuSeparator
 from tcoda.widgets._resizable import Resizable
 from tcoda.widgets._settings_item import SettingsMenuItem
 from tcoda.widgets._tabbed_content import TabbedContent, TabPane
@@ -59,7 +59,6 @@ __all__ = [
     "HeaderArea",
     "LogViewer",
     "Menu",
-    "MenuAction",
     "MenuBar",
     "MenuEntry",
     "MenuItem",

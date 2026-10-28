@@ -23,7 +23,6 @@ works exactly as it does for a `Button`.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from typing import ClassVar
 
 from rich.console import RenderableType
@@ -39,11 +38,6 @@ from textual.widgets import Static
 
 from tcoda._text import mnemonic_text
 
-#: What a `MenuItem`'s `action` may be: a Textual action string run against
-#: the screen ("app.quit", "pick_database"), or a zero-argument callable,
-#: which may be async.
-MenuAction = str | Callable[[], Awaitable[None] | None]
-
 
 class MenuSeparator(Widget):
     """A non-selectable dividing line between menu items."""
@@ -58,8 +52,7 @@ class MenuItem(Widget):
 
     Choosing it posts `MenuItem.Pressed`, which bubbles up through the `Menu`
     and the `MenuBar` to the screen. If `action` is given, `MenuBar` also runs
-    it from inside its own worker -- which is what makes `push_screen_wait`
-    usable there, unlike in a plain message handler.
+    it against the screen, as a `Button` runs its own.
     """
 
     DEFAULT_CSS = """
@@ -95,7 +88,7 @@ class MenuItem(Widget):
         mnemonic: str | None = None,
         shortcut: str | None = None,
         disabled: bool = False,
-        action: MenuAction | None = None,
+        action: str | None = None,
         name: str | None = None,
         classes: str | None = None,
     ) -> None:
@@ -117,7 +110,10 @@ class MenuItem(Widget):
                 the footer. Purely a label -- the binding itself lives
                 wherever bindings live.
             disabled: See the `disabled` reactive.
-            action: Optionally run this as well as posting `Pressed`.
+            action: A Textual action string ("app.quit", "pick_database"),
+                run against the screen as well as posting `Pressed`. It runs
+                inside `MenuBar`'s own worker, so an action that awaits
+                `push_screen_wait` works there.
             name: The widget's name.
             classes: CSS classes.
         """

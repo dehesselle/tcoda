@@ -34,14 +34,15 @@ class SettingsMenuItem(MenuItem):
             mnemonic=mnemonic,
             shortcut=shortcut,
             disabled=disabled,
-            action=self._open,
             name=name,
             classes=classes,
         )
 
-    async def _open(self) -> None:
-        # Imported here rather than at module scope: tcoda.dialogs imports the
-        # settings machinery, and tcoda.widgets must stay importable without it.
+    def on_menu_item_pressed(self, event: MenuItem.Pressed) -> None:
+        # Not stopped: the app may be listening for it too.
+        #
+        # Imported here rather than at module scope: tcoda.dialogs pulls in
+        # machinery that tcoda.widgets must stay importable without.
         from tcoda.dialogs import SettingsDialog
 
-        await self.app.push_screen_wait(SettingsDialog())
+        self.app.push_screen(SettingsDialog())

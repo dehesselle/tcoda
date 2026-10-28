@@ -13,7 +13,6 @@ handful of `@on(MenuItem.Pressed, ...)` handlers.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any
 
 from textual import work
@@ -218,14 +217,8 @@ class MenuBar(Widget, can_focus=False):
 
     async def _chose(self, item: MenuItem) -> None:
         item.press()
-        if item.action is None:
-            return
-        if isinstance(item.action, str):
+        if item.action is not None:
             await self.app.run_action(item.action, default_namespace=self.screen)
-            return
-        outcome = item.action()
-        if isinstance(outcome, Awaitable):
-            await outcome
 
     async def _wait_for_layout(self) -> None:
         layout_done = asyncio.Event()

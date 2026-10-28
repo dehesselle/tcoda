@@ -33,9 +33,10 @@ class MainScreen(Screen):
   can appear in two menus and still act on the right thing.
 - **A handler that pushes a screen and waits needs `@work`.** Nothing in a
   plain message handler provides the worker context `push_screen_wait`
-  requires. The `action=` argument is the exception: `MenuBar` runs it from
-  inside its own worker, so a Textual action string or an async callable works
-  there without one.
+  requires. The `action=` argument is the exception: `MenuBar` runs that
+  action string from inside its own worker, so an action that awaits
+  `push_screen_wait` works there without one. It takes only a string, as
+  `Button`'s does; anything more is a `@on(MenuItem.Pressed)` handler.
 - **`MenuBar` installs its own key binding** on whichever screen it is mounted
   on — see [DESIGN.md](../DESIGN.md#widgets-that-own-a-key-bind-it-on-their-screen).
   The action is called `open_menubar` (exported as `OPEN_ACTION`), so
@@ -58,7 +59,7 @@ class MainScreen(Screen):
   rather than as a colour. Prefer a name the app does not already use.
 - **Ready-made items**: [`SettingsMenuItem`](../dialogs/SettingsDialog.md) and
   [`AboutMenuItem`](../dialogs/AboutDialog.md) each open their dialog with no
-  handler on the app's side.
-- **Type aliases for annotations**: `MenuAction` is what `action=` accepts (an
-  action string or a callable, sync or async); `MenuEntry` is anything that can
-  sit in a `Menu` (`MenuItem | MenuSeparator`).
+  handler on the app's side. They handle their own `Pressed` without stopping
+  it, so the app still hears it, and the bar closes as the dialog opens.
+- **Type alias for annotations**: `MenuEntry` is anything that can sit in a
+  `Menu` (`MenuItem | MenuSeparator`).
