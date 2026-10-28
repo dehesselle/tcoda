@@ -93,6 +93,9 @@ class MyApp(App[None]):
   tick labels and label below, with no room for an axis label that is not
   set. Override them on `Plot` for fixed sizes; y tick labels are then cropped
   to the space they get.
+- **A tick at either end of a range gets no mark of its own**: it falls on a
+  corner of the frame, which marks it already, and a mark would turn the
+  corner into a junction. Its label is drawn as usual.
 - **The component classes `plot--axis`, `plot--tick` and `plot--label`** style
   the frame and tick marks, the tick labels and the axis labels. The axis takes
   `$primary` while the plot has focus.

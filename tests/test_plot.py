@@ -294,6 +294,19 @@ async def test_the_extremes_stay_clear_of_the_frame() -> None:
         assert drawn_cells(plot) > 0
 
 
+async def test_ticks_at_the_ends_leave_the_corners_plain() -> None:
+    def draw(plot: Plot) -> None:
+        plot.x_limits = plot.y_limits = (0, 10)
+
+    async with drawn(draw) as plot:
+        rows = canvas(plot)._chars
+        assert (rows[0][0], rows[0][-1], rows[-1][0], rows[-1][-1]) == tuple("┏┓┗┛")
+        # The ends are still labelled.
+        assert x_labels(plot).split()[::5] == ["0", "10"]
+        y_ticks = text_of(plot, "#plot-y-ticks").split()
+        assert (y_ticks[0], y_ticks[-1]) == ("10", "0")
+
+
 async def test_x_ticks_thin_out_on_a_narrow_plot() -> None:
     class Narrow(App[None]):
         CSS = "Plot { width: 30; }"

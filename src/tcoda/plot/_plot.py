@@ -809,10 +809,13 @@ class Plot(Widget, can_focus=True):
         # Labels may reach out under the y axis, so they go on a canvas that
         # starts further left than the data's.
         shift = self._canvas.region.x - self._x_axis_canvas.region.x
-        bottom = viewport.region.bottom
+        right, bottom = viewport.region.right, viewport.region.bottom
         for tick in self._x_ticks_in_view(viewport):
-            self._canvas.add_box(tick.x, 0, (2, 0, 0, 0), axis_style)
-            self._canvas.add_box(tick.x, bottom, (0, 0, 2, 0), axis_style)
+            # A tick at either end of the range falls on a corner, which a
+            # mark would turn into a junction; the corner marks it already.
+            if 0 < tick.x < right:
+                self._canvas.add_box(tick.x, 0, (2, 0, 0, 0), axis_style)
+                self._canvas.add_box(tick.x, bottom, (0, 0, 2, 0), axis_style)
             self._x_axis_canvas.write_text(
                 tick.x + shift, 0, tick.label, tick_style, tick.align
             )
@@ -855,9 +858,12 @@ class Plot(Widget, can_focus=True):
         tick_style = self.get_component_rich_style("plot--tick")
         width = self._y_ticks_canvas.size.width
         shift = self._canvas.region.y - self._y_ticks_canvas.region.y
+        right, bottom = viewport.region.right, viewport.region.bottom
         for y, label in ticks:
-            self._canvas.add_box(0, y, (0, 0, 0, 2), axis_style)
-            self._canvas.add_box(viewport.region.right, y, (0, 2, 0, 0), axis_style)
+            # As for x: no mark on a corner.
+            if 0 < y < bottom:
+                self._canvas.add_box(0, y, (0, 0, 0, 2), axis_style)
+                self._canvas.add_box(right, y, (0, 2, 0, 0), axis_style)
             # Cropped, where CSS makes the column narrower, to leave a gap
             # before the axis.
             self._y_ticks_canvas.write_text(
