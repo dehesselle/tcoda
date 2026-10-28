@@ -833,6 +833,88 @@ async def test_a_keymap_moves_a_plot_key() -> None:
         assert plot.x_range == (0.0, 10.0)
 
 
+class Settling(App[None]):
+    """A plot, and every range message it posts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.changed: list[Plot.RangeChanged] = []
+        self.settled: list[Plot.RangeSettled] = []
+
+    def compose(self) -> ComposeResult:
+        yield Plot(id="signal")
+
+    @on(Plot.RangeChanged, "#signal")
+    def _changed(self, event: Plot.RangeChanged) -> None:
+        self.changed.append(event)
+
+    @on(Plot.RangeSettled, "#signal")
+    def _settled(self, event: Plot.RangeSettled) -> None:
+        self.settled.append(event)
+
+
+async def test_a_burst_of_moves_settles_once() -> None:
+    app = Settling()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.focus()
+        await pilot.press("plus", "left", "left")
+        assert app.settled == []
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        assert len(app.changed) == 3
+        assert len(app.settled) == 1
+        settled = app.settled[0]
+        assert settled.control is plot
+        assert (settled.x_range, settled.y_range) == (plot.x_range, plot.y_range)
+
+
+async def test_a_reset_settles_too() -> None:
+    app = Settling()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.focus()
+        await pilot.press("plus")
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        await pilot.press("r")
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        assert [event.x_range for event in app.settled][-1] == (0.0, 10.0)
+        assert len(app.settled) == 2
+
+
+async def test_limits_set_before_a_move_settles_keep_the_view() -> None:
+    app = Settling()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.focus()
+        await pilot.press("plus")
+        zoomed = plot.x_range
+        # A refresh arriving mid-gesture, with the range it had before.
+        plot.x_limits = (0, 12)
+        await pilot.pause()
+        assert plot.x_range == zoomed
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        await pilot.press("r")
+        assert plot.x_range == (0.0, 12.0)
+
+
+async def test_limits_set_once_settled_move_the_view() -> None:
+    app = Settling()
+    async with app.run_test(size=SIZE) as pilot:
+        plot = app.query_one(Plot)
+        plot.x_limits = (0, 10)
+        plot.focus()
+        await pilot.press("plus")
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        # As an app does on RangeSettled: fetch for the range, then show it.
+        plot.x_limits = app.settled[0].x_range
+        await pilot.pause()
+        assert plot.x_range == app.settled[0].x_range
+        assert plot._x_view is None
+
+
 # ------------------------------------------------------------------- theme
 
 

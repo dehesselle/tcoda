@@ -31,6 +31,7 @@ from textual.geometry import Offset, Region
 from textual.message import Message
 from textual.reactive import var
 from textual.style import Style
+from textual.timer import Timer
 from textual.widget import Widget
 
 from tcoda.plot._canvas import Canvas
@@ -87,6 +88,24 @@ class _XTick(NamedTuple):
     end: int
 
 
+class _RangeMessage(Message):
+    """The x and y range a plot shows.
+
+    `Plot.RangeChanged` and `Plot.RangeSettled` share this rather than one
+    extending the other: a handler for one would be called for both.
+    """
+
+    def __init__(self, plot: Plot, x_range: Range, y_range: Range) -> None:
+        self.plot = plot
+        self.x_range = x_range
+        self.y_range = y_range
+        super().__init__()
+
+    @property
+    def control(self) -> Plot:
+        return self.plot
+
+
 class Plot(Widget, can_focus=True):
     """Line, scatter, bar and error-bar plots, with axes that scale themselves.
 
@@ -97,18 +116,12 @@ class Plot(Widget, can_focus=True):
     | `plot--label` | The axis labels. |
     """
 
-    class RangeChanged(Message):
+    class RangeChanged(_RangeMessage):
         """The range shown changed: zoomed, panned, or reset to the limits."""
 
-        def __init__(self, plot: Plot, x_range: Range, y_range: Range) -> None:
-            self.plot = plot
-            self.x_range = x_range
-            self.y_range = y_range
-            super().__init__()
-
-        @property
-        def control(self) -> Plot:
-            return self.plot
+    class RangeSettled(_RangeMessage):
+        """Zooming, panning or resetting came to rest: nothing moved the range
+        for `SETTLE_DELAY` seconds. The time to fetch data for it."""
 
     COMPONENT_CLASSES: ClassVar[set[str]] = {"plot--axis", "plot--tick", "plot--label"}
 
@@ -217,6 +230,9 @@ class Plot(Widget, can_focus=True):
     #: How much further than the data an end that follows it goes, as a
     #: fraction of the range, so the extremes stay clear of the frame.
     AUTO_MARGIN: ClassVar[float] = 0.05
+    #: How long, in seconds, the range has to stay put after zooming, panning
+    #: or resetting before `RangeSettled` is posted.
+    SETTLE_DELAY: ClassVar[float] = 0.15
     #: Styles handed out, in turn, to datasets added without one.
     PALETTE: ClassVar[tuple[str, ...]] = (
         "$primary",
@@ -295,6 +311,8 @@ class Plot(Widget, can_focus=True):
         self._x_view: Range | None = None
         self._y_view: Range | None = None
         self._redraw_pending = False
+        #: Counts down to `RangeSettled`, from the last move of the range.
+        self._settle_timer: Timer | None = None
         #: Styles resolved against the theme, for the redraw in progress.
         self._styles: dict[str, Style] = {}
         #: What a left-button drag is moving, while one is: the legend, or
@@ -615,11 +633,15 @@ class Plot(Widget, can_focus=True):
     validate_y_limits = validate_x_limits
 
     def watch_x_limits(self) -> None:
-        self._x_view = None
+        # While the user is still zooming or panning, new limits only change
+        # where a reset goes; snapping back mid-gesture would undo them.
+        if self._settle_timer is None:
+            self._x_view = None
         self._schedule_redraw()
 
     def watch_y_limits(self) -> None:
-        self._y_view = None
+        if self._settle_timer is None:
+            self._y_view = None
         self._schedule_redraw()
 
     def _viewport(self) -> Viewport | None:
@@ -912,6 +934,13 @@ class Plot(Widget, can_focus=True):
             return
         self.post_message(self.RangeChanged(self, self.x_range, self.y_range))
         self._schedule_redraw()
+        if self._settle_timer is not None:
+            self._settle_timer.stop()
+        self._settle_timer = self.set_timer(self.SETTLE_DELAY, self._settled)
+
+    def _settled(self) -> None:
+        self._settle_timer = None
+        self.post_message(self.RangeSettled(self, self.x_range, self.y_range))
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool:
         axes = _VIEW_ACTIONS.get(action)

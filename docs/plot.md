@@ -135,6 +135,15 @@ class MyApp(App[None]):
   `@on(Plot.RangeChanged, "#id")` works. A press that moves nothing, at a
   bound say, posts nothing. Assigning `x_limits` posts nothing either: the
   app already knows.
+- **`Plot.RangeSettled` follows once the range has stayed put for
+  `SETTLE_DELAY`** (0.15 s, a class attribute): one message for a whole burst
+  of wheel notches or key presses, with the same fields. That is the moment
+  to fetch data for the new range. `RangeChanged` still comes with every
+  step, for whatever follows the range live.
+- **Limits assigned before the range settles do not move it.** A refresh
+  that lands mid-gesture would otherwise snap the view back under the user's
+  hands. The new limits are still where `reset_range` goes; assigned after
+  `RangeSettled`, they move the view as usual.
 
 ## Provenance
 
