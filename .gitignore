@@ -18,3 +18,6 @@ src/tcoda/version.py
 .mypy_cache
 .pytest_cache
 .ruff_cache
+
+# IDE settings
+.vscode
