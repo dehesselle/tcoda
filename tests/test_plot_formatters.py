@@ -3,17 +3,25 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import UTC, datetime
+
 import pytest
 
-from tcoda.plot import AxisFormatter, DurationFormatter, NumericAxisFormatter
+from tcoda.plot import (
+    AxisFormatter,
+    CategoricalFormatter,
+    DateTimeFormatter,
+    DurationFormatter,
+    NumericFormatter,
+)
 
 
 @pytest.fixture
-def numeric_formatter() -> NumericAxisFormatter:
-    return NumericAxisFormatter()
+def numeric_formatter() -> NumericFormatter:
+    return NumericFormatter()
 
 
-class TestNumericAxisFormatter:
+class TestNumericFormatter:
     @pytest.mark.parametrize(
         "xmin, xmax, expected",
         [
@@ -22,9 +30,7 @@ class TestNumericAxisFormatter:
             (1 / 30, 1.0, [0.2, 0.4, 0.6, 0.8, 1.0]),
         ],
     )
-    def test_get_ticks(
-        self, numeric_formatter: NumericAxisFormatter, xmin, xmax, expected
-    ):
+    def test_get_ticks(self, numeric_formatter: NumericFormatter, xmin, xmax, expected):
         ticks = numeric_formatter.get_ticks(xmin, xmax)
         assert ticks == pytest.approx(expected)
 
@@ -37,7 +43,7 @@ class TestNumericAxisFormatter:
         ],
     )
     def test_get_ticks_and_labels(
-        self, numeric_formatter: NumericAxisFormatter, xmin, xmax, expected
+        self, numeric_formatter: NumericFormatter, xmin, xmax, expected
     ):
         ticks, labels = numeric_formatter.get_ticks_and_labels(xmin, xmax)
         assert ticks == pytest.approx(expected)
@@ -46,27 +52,25 @@ class TestNumericAxisFormatter:
         # Ensure labels are strings
         assert all(isinstance(label, str) for label in labels)
 
-    def test_get_labels_for_ticks(self, numeric_formatter: NumericAxisFormatter):
+    def test_get_labels(self, numeric_formatter: NumericFormatter):
         ticks = [0.0, 0.5, 1.0, 1.5, 2.0]
-        labels = numeric_formatter.get_labels_for_ticks(ticks)
+        labels = numeric_formatter.get_labels(ticks)
         # With spacing of 0.5, decimals should be auto-determined as 1
         assert labels == ["0.0", "0.5", "1.0", "1.5", "2.0"]
 
-    def test_get_labels_for_ticks_auto_decimals(
-        self, numeric_formatter: NumericAxisFormatter
-    ):
+    def test_get_labels_auto_decimals(self, numeric_formatter: NumericFormatter):
         # Test that decimals are automatically determined from tick spacing
         ticks = [0.0, 0.05, 0.10, 0.15, 0.20]
-        labels = numeric_formatter.get_labels_for_ticks(ticks)
+        labels = numeric_formatter.get_labels(ticks)
         # With spacing of 0.05, decimals should be 2
         assert labels == ["0.00", "0.05", "0.10", "0.15", "0.20"]
 
-    def test_get_labels_for_empty_ticks(self, numeric_formatter: NumericAxisFormatter):
-        labels = numeric_formatter.get_labels_for_ticks([])
+    def test_get_labels_for_empty_ticks(self, numeric_formatter: NumericFormatter):
+        labels = numeric_formatter.get_labels([])
         assert labels == []
 
-    def test_is_axis_formatter(self, numeric_formatter: NumericAxisFormatter):
-        # Ensure NumericAxisFormatter is an instance of AxisFormatter
+    def test_is_axis_formatter(self, numeric_formatter: NumericFormatter):
+        # Ensure NumericFormatter is an instance of AxisFormatter
         assert isinstance(numeric_formatter, AxisFormatter)
 
 
@@ -112,26 +116,26 @@ class TestDurationFormatter:
         # Should get ticks at 0.5 hour intervals
         assert ticks == pytest.approx([0.0, 1800.0, 3600.0, 5400.0, 7200.0])
 
-    def test_get_labels_for_ticks(self, duration_formatter: DurationFormatter):
+    def test_get_labels(self, duration_formatter: DurationFormatter):
         # Test label formatting for seconds
         ticks = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
-        labels = duration_formatter.get_labels_for_ticks(ticks)
+        labels = duration_formatter.get_labels(ticks)
         assert labels == ["0s", "2s", "4s", "6s", "8s", "10s"]
 
-    def test_get_labels_for_ticks_minutes(self, duration_formatter: DurationFormatter):
+    def test_get_labels_minutes(self, duration_formatter: DurationFormatter):
         # Test label formatting for minutes
         ticks = [0.0, 120.0, 240.0, 360.0, 480.0, 600.0]  # 0, 2, 4, 6, 8, 10 minutes
-        labels = duration_formatter.get_labels_for_ticks(ticks)
+        labels = duration_formatter.get_labels(ticks)
         assert labels == ["0min", "2min", "4min", "6min", "8min", "10min"]
 
-    def test_get_labels_for_ticks_hours(self, duration_formatter: DurationFormatter):
+    def test_get_labels_hours(self, duration_formatter: DurationFormatter):
         # Test label formatting for hours
         ticks = [0.0, 3600.0, 7200.0]  # 0, 1, 2 hours
-        labels = duration_formatter.get_labels_for_ticks(ticks)
+        labels = duration_formatter.get_labels(ticks)
         assert labels == ["0h", "1h", "2h"]
 
     def test_get_labels_for_empty_ticks(self, duration_formatter: DurationFormatter):
-        labels = duration_formatter.get_labels_for_ticks([])
+        labels = duration_formatter.get_labels([])
         assert labels == []
 
     def test_get_ticks_and_labels(self, duration_formatter: DurationFormatter):
@@ -149,3 +153,56 @@ class TestDurationFormatter:
     def test_is_axis_formatter(self, duration_formatter: DurationFormatter):
         # Ensure DurationFormatter is an instance of AxisFormatter
         assert isinstance(duration_formatter, AxisFormatter)
+
+
+class TestNumericFormatterEdges:
+    def test_descending_ticks_are_labelled(self):
+        assert NumericFormatter().get_labels([1.0, 0.5, 0.0]) == ["1.0", "0.5", "0.0"]
+
+    def test_repeated_ticks_are_labelled(self):
+        assert NumericFormatter().get_labels([2.0, 2.0]) == ["2", "2"]
+
+
+class TestCategoricalFormatter:
+    def test_labels_sit_on_whole_numbers_from_one(self):
+        formatter = CategoricalFormatter(["a", "b", "c"])
+        assert formatter.get_ticks(0, 10) == [1.0, 2.0, 3.0]
+        assert formatter.get_labels([1.0, 2.2, 3.0, 4.0, 0.0]) == [
+            "a",
+            "b",
+            "c",
+            "",
+            "",
+        ]
+
+
+#: 2023-11-14 22:13:20 UTC.
+START = 1.7e9
+DAY = 86400
+
+
+class TestDateTimeFormatter:
+    @pytest.mark.parametrize("days", [1, 3, 31, 45, 200, 400, 2000])
+    def test_no_two_ticks_fall_on_the_same_boundary(self, days):
+        ticks, labels = DateTimeFormatter().get_ticks_and_labels(
+            START, START + days * DAY
+        )
+        assert len(set(ticks)) == len(ticks) > 1
+        assert len(set(labels)) == len(labels)
+
+    def test_a_month_is_labelled_by_day(self):
+        _, labels = DateTimeFormatter().get_ticks_and_labels(START, START + 31 * DAY)
+        assert all(label.endswith(", 2023") or ", 20" in label for label in labels)
+
+    def test_ticks_fall_on_midnight(self):
+        ticks = DateTimeFormatter().get_ticks(START, START + 5 * DAY)
+        assert all(tick % DAY == 0 for tick in ticks)
+
+    def test_hours_repeat_the_date_only_when_it_changes(self):
+        ticks, labels = DateTimeFormatter().get_ticks_and_labels(
+            START - 0.5 * DAY, START + 0.5 * DAY
+        )
+        days = [datetime.fromtimestamp(tick, UTC).date() for tick in ticks]
+        changed = [i == 0 or days[i] != days[i - 1] for i in range(len(days))]
+        assert sum(changed) >= 2
+        assert ["," in label for label in labels] == changed

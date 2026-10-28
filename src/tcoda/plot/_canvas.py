@@ -3,1764 +3,385 @@
 #
 # SPDX-License-Identifier: MIT
 
-import enum
-from collections.abc import AsyncIterator, Callable, Iterable, Iterator
-from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass
+"""A grid of cells to draw on, one character and one style per cell.
+
+Coordinates come in two kinds. A *cell* is an ``(int, int)`` position. A
+*point* is a ``(float, float)`` position in the same units, so ``(2.5, 0.0)``
+is halfway across the third cell; points are what the high-resolution modes
+draw, lighting whichever sub-cell they fall in.
+
+Nothing here knows about plots. The canvas is drawn on in one go and then
+refreshed once: every drawing call writes to the buffer only, and the owner
+calls `refresh()` when it is done.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Sequence
+from itertools import pairwise
 from math import ceil, floor
-from typing import ClassVar, Self
 
 from rich.segment import Segment
 from rich.style import Style
-from rich.text import Text
-from textual._box_drawing import BOX_CHARACTERS
-from textual.geometry import Region, Size
+from textual import events
+from textual.css.types import AlignHorizontal
 from textual.message import Message
 from textual.strip import Strip
 from textual.widget import Widget
 
-from tcoda.plot._hires import HiResMode, hires_sizes, pixels
+from tcoda.plot._hires import CELL_GRID, GLYPHS, HiResMode
 
-get_box = BOX_CHARACTERS.__getitem__
+#: Which arms of a box-drawing character are present, as (top, right, bottom,
+#: left); 2 is a heavy arm, 0 none.
+type Quad = tuple[int, int, int, int]
 
-
-class TextAlign(enum.Enum):
-    LEFT = enum.auto()
-    CENTER = enum.auto()
-    RIGHT = enum.auto()
+# Only heavy lines are drawn, so these are all the glyphs there can be.
+_HEAVY_BOX: dict[Quad, str] = {
+    (0, 2, 0, 2): "━",
+    (2, 0, 2, 0): "┃",
+    (0, 2, 2, 0): "┏",
+    (0, 0, 2, 2): "┓",
+    (2, 2, 0, 0): "┗",
+    (2, 0, 0, 2): "┛",
+    (2, 2, 2, 0): "┣",
+    (2, 0, 2, 2): "┫",
+    (0, 2, 2, 2): "┳",
+    (2, 2, 0, 2): "┻",
+    (2, 2, 2, 2): "╋",
+    (0, 2, 0, 0): "╺",
+    (0, 0, 0, 2): "╸",
+    (2, 0, 0, 0): "╹",
+    (0, 0, 2, 0): "╻",
+}
 
 
 class Canvas(Widget):
-    """A widget that renders a 2D canvas."""
+    """Cells to draw on, sized to the widget."""
 
-    @dataclass
-    class Resize(Message):
-        canvas: "Canvas"
-        size: Size
+    class Resized(Message):
+        """The canvas changed size, so what was drawn on it is gone."""
 
-    default_hires_mode: HiResMode
+        def __init__(self, canvas: Canvas) -> None:
+            self.canvas = canvas
+            super().__init__()
 
-    _canvas_size: Size
-    _canvas_region: Region
-    _buffer: list[list[str]]
-    _styles: list[list[str]]
+        @property
+        def control(self) -> Canvas:
+            return self.canvas
 
-    # Style cache to avoid reparsing identical style strings
-    _style_cache: ClassVar[dict[str, Style]] = {}
+    def __init__(self, *, id: str | None = None) -> None:
+        super().__init__(id=id)
+        self._width = 0
+        self._height = 0
+        self._chars: list[list[str]] = []
+        self._styles: list[list[Style | None]] = []
+        #: Box-drawing arms per cell, merged so crossing lines join up.
+        self._boxes: dict[tuple[int, int], Quad] = {}
 
-    def __init__(
-        self,
-        width: int = 40,
-        height: int = 20,
-        default_hires_mode: HiResMode | None = HiResMode.BRAILLE,
-        name: str | None = None,
-        id: str | None = None,
-        classes: str | None = None,
-        disabled: bool = False,
-    ):
-        """Initialize the Canvas widget.
+    def _on_resize(self, event: events.Resize) -> None:
+        self.reset()
+        self.post_message(self.Resized(self))
 
-        Args:
-            width: The width of the canvas. Defaults to 40.
-            height: The height of the canvas. Defaults to 20.
-            default_hires_mode: The default high-resolution mode. Defaults to
-                HiresMode.BRAILLE.
-            name: The name of the widget. Defaults to None.
-            id: The ID of the widget. Defaults to None.
-            classes: The CSS classes of the widget. Defaults to None.
-            disabled: Whether the widget is disabled. Defaults to False.
-        """
-        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-
-        self._refreshes_pending: int = 0
-        # reference count batch refreshes
-
-        self._buffer = []
-        self._styles = []
-        self._canvas_size = Size(0, 0)
-        self._canvas_region = Region()
-
-        self.default_hires_mode = default_hires_mode or HiResMode.BRAILLE
-
-        self.reset(size=Size(width, height), refresh=False)
-
-    @contextmanager
-    def batch_refresh(self) -> Iterator[None]:
-        """Context manager that defers call to refresh until exiting the context.
-
-        This is useful when making multiple changes to the canvas and only wanting
-        to trigger refresh once at the end.
-
-        Example:
-            ```python
-            with canvas.batch_changes():
-                canvas.set_pixel(0, 0)
-                canvas.set_pixel(1, 1)
-                canvas.set_pixel(2, 2)
-            # Refresh called
-            ```
-
-        Yields:
-            Iterator[None]: A context manager.
-        """
-        self._refreshes_pending += 1
-        try:
-            yield
-        finally:
-            self._refreshes_pending -= 1
-            if self._refreshes_pending == 0:
-                self.refresh()
-
-    @asynccontextmanager
-    async def async_batch_refresh(self) -> AsyncIterator[None]:
-        """Async context manager that defers call to refresh until exiting the context.
-
-        This is useful when making multiple asynchronous changes to the canvas and only wanting
-        to trigger refresh once at the end.
-
-        Example:
-                Yields:
-        AsyncIterator[None]: An async context manager.
-        """
-        self._refreshes_pending += 1
-        try:
-            yield
-        finally:
-            self._refreshes_pending -= 1
-            if self._refreshes_pending == 0:
-                self.refresh()
-
-    def refresh(
-        self,
-        *regions: Region,
-        repaint: bool = True,
-        layout: bool = False,
-        recompose: bool = False,
-    ) -> Self:
-        if self._refreshes_pending:
-            return self
-        super().refresh(*regions, repaint=repaint, layout=layout, recompose=recompose)
-        return self
-
-    def _on_resize(self, event: Resize) -> None:
-        self.post_message(self.Resize(canvas=self, size=event.size))
-
-    def reset(self, size: Size | None = None, refresh: bool = True) -> None:
-        """Resets the canvas to the specified size or to the current size if no size is provided.
-        Clears buffers,styles and dirty cache, and resets the canvas size.
-
-        Args:
-            size: The new size for the canvas.
-            refresh: Whether to refresh the canvas after resetting.
-        Returns:
-            self for chaining.
-        """
-        # Update size and regions if provided
-        if size:
-            self._canvas_size = size
-            self._canvas_region = Region(0, 0, size.width, size.height)
-
-        # Initialize buffers if we have a valid size
-        if self._canvas_size:
-            width = self._canvas_size.width
-            height = self._canvas_size.height
-
-            # More efficient buffer creation using list comprehension with multiplication
-            # This is significantly faster than nested loops for large buffers
-            self._buffer = [[" "] * width for _ in range(height)]
-            self._styles = [[""] * width for _ in range(height)]
-
-        # Only refresh if requested
-        if refresh:
-            self.refresh()
+    def reset(self) -> None:
+        """Blank every cell, at the widget's current size."""
+        self._width, self._height = self.size
+        self._chars = [[" "] * self._width for _ in range(self._height)]
+        self._styles = [[None] * self._width for _ in range(self._height)]
+        self._boxes = {}
 
     def render_line(self, y: int) -> Strip:
-        """Renders a single line of the canvas at the given y-coordinate.
-
-        Args:
-            y: The y-coordinate of the line.
-        Returns:
-            A Strip representing the line.
-        """
-        # Fast path for out-of-bounds or uninitialized
-        if not self._canvas_size.area or y >= self._canvas_size.height:
-            return Strip.blank(cell_length=0)
-
+        if y >= self._height:
+            return Strip.blank(self.size.width, self.rich_style)
         base_style = self.rich_style
-        buffer_line = self._buffer[y]
-        styles_line = self._styles[y]
+        chars = self._chars[y]
+        if all(char == " " for char in chars):
+            return Strip.blank(self._width, base_style)
 
-        # Fast path for blank lines
-        if all(char == " " for char in buffer_line):
-            return Strip.blank(cell_length=len(buffer_line), style=base_style)
-
-        # Create segments with batching by style
+        # One segment per run of cells sharing a style.
         segments: list[Segment] = []
-        append = segments.append  # Local reference for faster calls
-
-        # Batch processing for same style segments
-        current_style_str = None
-        current_style_obj = None
-        current_text = ""
-
-        for char, style_str in zip(buffer_line, styles_line):
-            # When style changes, add current batch and start new one
-            if style_str != current_style_str:
-                # Add current batch if it exists
-                if current_text:
-                    append(Segment(current_text, style=base_style + current_style_obj))
-
-                # Start new batch
-                current_style_str = style_str
-                current_text = char
-
-                # Get style object from cache or create new one
-                if style_str:
-                    if style_str not in self._style_cache:
-                        self._style_cache[style_str] = Style.parse(style_str)
-                    current_style_obj = self._style_cache[style_str]
-                else:
-                    current_style_obj = None
-            else:
-                # Add to current batch
-                current_text += char
-
-        # Add the final batch
-        if current_text:
-            append(Segment(current_text, style=base_style + current_style_obj))
-
+        run_style = self._styles[y][0]
+        run = ""
+        for char, style in zip(chars, self._styles[y]):
+            if style is not run_style and style != run_style:
+                segments.append(Segment(run, base_style + run_style))
+                run_style, run = style, ""
+            run += char
+        segments.append(Segment(run, base_style + run_style))
         return Strip(segments).simplify()
 
-    def get_pixel(self, x: int, y: int) -> tuple[str, str]:
-        """Retrieves the character and style of a single pixel at the given coordinates.
+    # ------------------------------------------------------------ cells
 
-        Args:
-            x: The x-coordinate of the pixel.
-            y: The y-coordinate of the pixel.
-        Returns:
-            A tuple containing the character and style of the pixel.
-        """
-        return self._buffer[y][x], self._styles[y][x]
+    def contains(self, x: int, y: int) -> bool:
+        return 0 <= x < self._width and 0 <= y < self._height
 
-    def set_pixel(self, x: int, y: int, char: str = "█", style: str = "white") -> None:
-        """Sets a single pixel at the given coordinates.
-        Also marks it dirty for refreshing.
+    def get_cell(self, x: int, y: int) -> str:
+        return self._chars[y][x]
 
-        Args:
-            x: The x-coordinate of the pixel.
-            y: The y-coordinate of the pixel.
-            char: The character to draw.
-            style: The style to apply to the character.
-        """
-        # Fast rejection path without assert for performance
-        if not (
-            0 <= x < self._canvas_region.width and 0 <= y < self._canvas_region.height
-        ):
+    def set_cell(self, x: int, y: int, char: str, style: Style) -> None:
+        """Draw one character; a cell off the canvas is ignored."""
+        if self.contains(x, y):
+            self._chars[y][x] = char
+            self._styles[y][x] = style
+
+    def add_box(self, x: int, y: int, quad: Quad, style: Style) -> None:
+        """Add heavy box-drawing arms to a cell, joining any already there."""
+        if not self.contains(x, y):
             return
+        if (current := self._boxes.get((x, y))) is not None:
+            quad = tuple(map(max, current, quad))  # type: ignore[assignment]
+        self._boxes[x, y] = quad
+        self.set_cell(x, y, _HEAVY_BOX[quad], style)
 
-        self._buffer[y][x] = char
-        self._styles[y][x] = style
-        self.refresh()
-
-    def set_pixels(
-        self,
-        coordinates: Iterable[tuple[int, int]],
-        char: str = "█",
-        style: str = "white",
-    ) -> None:
-        """Sets multiple pixels at the given coordinates.
-
-        Args:
-            coordinates: An iterable of tuples representing the coordinates of the pixels.
-            char: The character to draw.
-            style: The style to apply to the character.
-        """
-        # Check if we have coordinates
-        coord_list = list(coordinates)
-        if not coord_list:
-            return
-
-        # Batch updates to avoid calling refresh for each pixel
-        # Cache properties for faster access in the loop
-        buffer = self._buffer
-        styles = self._styles
-        width = self._canvas_region.width
-        height = self._canvas_region.height
-
-        # Process all pixels first, then refresh once
-        for x, y in coord_list:
-            if 0 <= x < width and 0 <= y < height:
-                buffer[y][x] = char
-                styles[y][x] = style
-
-        # Only refresh once after all updates
-        self.refresh()
-
-    def set_hires_pixels(
-        self,
-        coordinates: Iterable[tuple[float, float]],
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Sets multiple pixels at the given coordinates using the specified Hi-Res mode.
-
-        Args:
-            coordinates: An iterable of tuples representing the coordinates of the pixels.
-            hires_mode: The Hi-Res mode to use.
-            style: The style to apply to the character.
-        """
-        # Use default mode if none provided
-        hires_mode = hires_mode or self.default_hires_mode
-        pixel_size = hires_sizes[hires_mode]
-        pixel_info = pixels.get(hires_mode)
-        assert pixel_info is not None
-
-        # Group coordinates by their cell position to minimize buffer operations
-        cells_to_update: dict[tuple[int, int], set[tuple[int, int]]] = {}
-
-        # Pre-compute these values outside the loop for better performance
-        w_factor = pixel_size.width
-        h_factor = pixel_size.height
-
-        # Process all coordinates and group them by their target cell
-        for x, y in coordinates:
-            # Early rejection for out-of-bounds
-            if not self._canvas_region.contains(floor(x), floor(y)):
-                continue
-
-            # Calculate high-res coordinates
-            hx = floor(x * w_factor)
-            hy = floor(y * h_factor)
-
-            # Calculate which cell this belongs to and offset within cell
-            cell_x = hx // w_factor
-            cell_y = hy // h_factor
-
-            # Get or create the set for this cell
-            cell_key = (cell_x, cell_y)
-            if cell_key not in cells_to_update:
-                cells_to_update[cell_key] = set()
-
-            # Add this point to the cell's set
-            offset_x = hx % w_factor
-            offset_y = hy % h_factor
-            cells_to_update[cell_key].add((offset_x, offset_y))
-
-        # Process each cell that needs updating
-        for (cell_x, cell_y), points in cells_to_update.items():
-            # A small buffer just for this cell, row by row
-            cell_buffer = [0] * (w_factor * h_factor)
-
-            # Mark each point in the buffer
-            for offset_x, offset_y in points:
-                cell_buffer[offset_y * w_factor + offset_x] = 1
-
-            # Look up the character for this pattern of subpixels
-            subpixels = tuple(cell_buffer)
-            if char := pixel_info[subpixels]:
-                self.set_pixel(
-                    cell_x,
-                    cell_y,
-                    char=char,
-                    style=style,
-                )
+    def draw_box(self, x0: int, y0: int, x1: int, y1: int, style: Style) -> None:
+        """Draw a heavy frame with its corners at (x0, y0) and (x1, y1)."""
+        for x in range(x0 + 1, x1):
+            self.add_box(x, y0, (0, 2, 0, 2), style)
+            self.add_box(x, y1, (0, 2, 0, 2), style)
+        for y in range(y0 + 1, y1):
+            self.add_box(x0, y, (2, 0, 2, 0), style)
+            self.add_box(x1, y, (2, 0, 2, 0), style)
+        self.add_box(x0, y0, (0, 2, 2, 0), style)
+        self.add_box(x1, y0, (0, 0, 2, 2), style)
+        self.add_box(x0, y1, (2, 2, 0, 0), style)
+        self.add_box(x1, y1, (2, 0, 0, 2), style)
 
     def draw_line(
-        self, x0: int, y0: int, x1: int, y1: int, char: str = "█", style: str = "white"
+        self, x0: int, y0: int, x1: int, y1: int, char: str, style: Style
     ) -> None:
-        """Draws a line from (x0, y0) to (x1, y1) using the specified character and style.
-
-        Args:
-            x0: The x-coordinate of the start of the line.
-            y0: The y-coordinate of the start of the line.
-            x1: The x-coordinate of the end of the line.
-            y1: The y-coordinate of the end of the line.
-            char: The character to draw.
-            style: The style to apply to the character.
-        """
-        # Use Cohen-Sutherland clipping for efficient bounds checking
-        clipped = self._clip_line_cohen_sutherland(
-            float(x0), float(y0), float(x1), float(y1)
-        )
-
-        if clipped is None:
-            # Line is completely outside canvas
+        """Draw a line of cells between two cells, inclusive."""
+        if (clipped := self._clip(x0, y0, x1, y1)) is None:
             return
+        cx0, cy0, cx1, cy1 = (int(c) for c in clipped)
+        for x, y in _line(cx0, cy0, cx1, cy1):
+            self.set_cell(x, y, char, style)
 
-        # Use clipped coordinates
-        cx0, cy0, cx1, cy1 = clipped
-        self.set_pixels(
-            self._get_line_coordinates(int(cx0), int(cy0), int(cx1), int(cy1)),
-            char,
-            style,
-        )
-
-    def draw_lines(
-        self,
-        coordinates: Iterable[tuple[int, int, int, int]],
-        char: str = "█",
-        style: str = "white",
+    def fill_rect(
+        self, x0: int, y0: int, x1: int, y1: int, char: str, style: Style
     ) -> None:
-        """Draws multiple lines from given coordinates using the specified character and style.
-
-        Args:
-            coordinates: An iterable of tuples representing the coordinates of the lines.
-            char: The character to draw.
-            style: The style to apply to the character.
-        """
-        # Convert to list for multiple passes
-        coord_list = list(coordinates)
-        if not coord_list:
-            return
-
-        # Collect all pixels from all lines before rendering
-        all_pixels = []
-
-        for x0, y0, x1, y1 in coord_list:
-            # Use Cohen-Sutherland clipping for efficient bounds checking
-            clipped = self._clip_line_cohen_sutherland(
-                float(x0), float(y0), float(x1), float(y1)
-            )
-
-            if clipped is None:
-                # Line is completely outside canvas
-                continue
-
-            # Get coordinates for this line and extend the pixel collection
-            cx0, cy0, cx1, cy1 = clipped
-            line_pixels = self._get_line_coordinates(
-                int(cx0), int(cy0), int(cx1), int(cy1)
-            )
-            all_pixels.extend(line_pixels)
-
-        # Draw all pixels at once with a single refresh
-        if all_pixels:
-            self.set_pixels(all_pixels, char, style)
-
-    def draw_hires_line(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draws a high-resolution line from (x0, y0) to (x1, y1) using the specified character and style.
-
-        Args:
-            x0: The x-coordinate of the start of the line.
-            y0: The y-coordinate of the start of the line.
-            x1: The x-coordinate of the end of the line.
-            y1: The y-coordinate of the end of the line.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the character.
-        """
-        self.draw_hires_lines([(x0, y0, x1, y1)], hires_mode, style)
-
-    def draw_hires_lines(
-        self,
-        coordinates: Iterable[tuple[float, float, float, float]],
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draws multiple high-resolution lines from given coordinates using the specified character and style.
-
-        Args:
-            coordinates: An iterable of tuples representing the coordinates of the lines.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the character.
-        """
-        # Early out if no coordinates
-        if not coordinates:
-            return
-
-        # Convert to list if not already for multiple passes
-        coord_list = list(coordinates)
-
-        hires_mode = hires_mode or self.default_hires_mode
-        pixel_size = hires_sizes[hires_mode]
-
-        # Pre-compute multiplication factors once
-        w_factor = pixel_size.width
-        h_factor = pixel_size.height
-        inv_w_factor = 1.0 / w_factor
-        inv_h_factor = 1.0 / h_factor
-
-        # Initialize an empty list for collecting pixel coordinates
-        pixels: list[tuple[float, float]] = []
-        pixels_append = pixels.append  # Local reference for faster calls
-
-        # Process each line
-        for x0, y0, x1, y1 in coord_list:
-            # Use Cohen-Sutherland clipping for efficient bounds checking
-            clipped = self._clip_line_cohen_sutherland(
-                float(x0), float(y0), float(x1), float(y1)
-            )
-
-            if clipped is None:
-                # Line is completely outside canvas
-                continue
-
-            # Use clipped coordinates
-            cx0, cy0, cx1, cy1 = clipped
-
-            # Convert to high-res grid coordinates
-            hx0 = floor(cx0 * w_factor)
-            hy0 = floor(cy0 * h_factor)
-            hx1 = floor(cx1 * w_factor)
-            hy1 = floor(cy1 * h_factor)
-
-            # Get line coordinates
-            coords = self._get_line_coordinates(hx0, hy0, hx1, hy1)
-
-            # Convert back to canvas space and add to pixel array
-            # Use direct append and precalculated factors for better performance
-            for x, y in coords:
-                pixels_append((x * inv_w_factor, y * inv_h_factor))
-
-        # Only make one call to set_hires_pixels with all points
-        if pixels:
-            self.set_hires_pixels(pixels, hires_mode, style)
-
-    def draw_triangle(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        x2: int,
-        y2: int,
-        style: str = "white",
-    ) -> None:
-        """Draw a triangle outline using the specified style.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            style: The style to apply to the characters.
-        """
-
-        # Draw the three sides of the triangle
-        self.draw_lines(
-            [(x0, y0, x1, y1), (x1, y1, x2, y2), (x2, y2, x0, y0)], "█", style
-        )
-
-    def draw_hires_triangle(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        x2: float,
-        y2: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a high-resolution triangle outline using the specified style.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the characters.
-        """
-
-        # Draw the three sides of the triangle with high-resolution
-        self.draw_hires_lines(
-            [(x0, y0, x1, y1), (x1, y1, x2, y2), (x2, y2, x0, y0)], hires_mode, style
-        )
-
-    def draw_filled_triangle(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        x2: int,
-        y2: int,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled triangle using the specified style.
-        Uses a scanline algorithm for efficient filling.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            style: The style to apply to the characters.
-        """
-        # Sort vertices by y-coordinate (y0 <= y1 <= y2)
-        if y0 > y1:
-            x0, y0, x1, y1 = x1, y1, x0, y0
-        if y1 > y2:
-            x1, y1, x2, y2 = x2, y2, x1, y1
-        if y0 > y1:
-            x0, y0, x1, y1 = x1, y1, x0, y0
-
-        # Skip if all points are the same or triangle has no height
-        if (y0 == y1 == y2) or (y0 == y2):
-            return
-
-        # Initialize empty list for all pixel coordinates
-        pixels: list[tuple[int, int]] = []
-        pixels_append = pixels.append
-
-        # Calculate interpolation factor for the middle point
-        inv_slope02 = (x2 - x0) / (y2 - y0) if y2 != y0 else 0
-
-        # First half of the triangle (bottom flat or top)
-        if y1 == y0:  # Flat top triangle
-            self._fill_flat_top_triangle(x0, y0, x1, y1, x2, y2, pixels_append)
-        elif y1 == y2:  # Flat bottom triangle
-            self._fill_flat_bottom_triangle(x0, y0, x1, y1, x2, y2, pixels_append)
-        else:  # General triangle - split into flat-top and flat-bottom
-            # Calculate the x-coordinate of the point on the long edge that has y = y1
-            x3 = int(x0 + inv_slope02 * (y1 - y0))
-
-            # Fill the flat bottom part
-            self._fill_flat_bottom_triangle(x0, y0, x1, y1, x3, y1, pixels_append)
-
-            # Fill the flat top part
-            self._fill_flat_top_triangle(x1, y1, x3, y1, x2, y2, pixels_append)
-
-        # Draw all pixels at once
-        if pixels:
-            self.set_pixels(pixels, "█", style)
-
-    def _fill_flat_bottom_triangle(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        x2: int,
-        y1_dup: int,
-        pixels_append: Callable[[tuple[int, int]], None],
-    ) -> None:
-        """Helper method to fill a flat-bottom triangle (private method)."""
-        dx1 = (x1 - x0) / (y1 - y0) if y1 != y0 else 0
-        dx2 = (x2 - x0) / (y1 - y0) if y1 != y0 else 0
-
-        # Initialize scanline coordinates
-        x_start = x_end = float(x0)
-
-        # Scan from top to bottom
-        for y in range(y0, y1 + 1):
-            # Add all pixels in this scanline
-            for x in range(int(x_start), int(x_end) + 1):
-                pixels_append((x, y))
-
-            # Update scanline endpoints
-            x_start += dx1
-            x_end += dx2
-
-    def _fill_flat_top_triangle(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y0_dup: int,
-        x2: int,
-        y2: int,
-        pixels_append: Callable[[tuple[int, int]], None],
-    ) -> None:
-        """Helper method to fill a flat-top triangle (private method)."""
-        dx1 = (x2 - x0) / (y2 - y0) if y2 != y0 else 0
-        dx2 = (x2 - x1) / (y2 - y0) if y2 != y0 else 0
-
-        # Initialize scanline coordinates
-        x_start = float(x0)
-        x_end = float(x1)
-
-        # Scan from top to bottom
-        for y in range(y0, y2 + 1):
-            # Add all pixels in this scanline
-            for x in range(int(x_start), int(x_end) + 1):
-                pixels_append((x, y))
-
-            # Update scanline endpoints
-            x_start += dx1
-            x_end += dx2
-
-    def draw_filled_hires_triangle(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        x2: float,
-        y2: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled high-resolution triangle using the specified style.
-        Uses a scanline algorithm with subpixel precision.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the characters.
-        """
-        # Use default hires mode if none provided
-        hires_mode = hires_mode or self.default_hires_mode
-
-        # Sort vertices by y-coordinate (y0 <= y1 <= y2)
-        if y0 > y1:
-            x0, y0, x1, y1 = x1, y1, x0, y0
-        if y1 > y2:
-            x1, y1, x2, y2 = x2, y2, x1, y1
-        if y0 > y1:
-            x0, y0, x1, y1 = x1, y1, x0, y0
-
-        # Skip if all points are the same or triangle has no height
-        if abs(y0 - y2) < 1e-6:
-            return
-
-        # Initialize pixel collection
-        pixels: list[tuple[float, float]] = []
-        pixels_append = pixels.append
-
-        # Define helper function to add a hi-res pixel
-        def add_hires_pixel(x: float, y: float) -> None:
-            pixels_append((x, y))
-
-        # No edge parameters needed
-
-        # Process based on triangle shape
-        if abs(y1 - y0) < 1e-6:  # Flat top triangle
-            self._fill_flat_top_hires_triangle(x0, y0, x1, y1, x2, y2, add_hires_pixel)
-        elif abs(y1 - y2) < 1e-6:  # Flat bottom triangle
-            self._fill_flat_bottom_hires_triangle(
-                x0, y0, x1, y1, x2, y2, add_hires_pixel
-            )
-        else:  # General triangle - split into flat-top and flat-bottom
-            # Calculate the interpolation factor for the split point
-            t = (y1 - y0) / (y2 - y0)
-
-            # Calculate the x-coordinate of the point on the long edge that has y = y1
-            x3 = x0 + t * (x2 - x0)
-
-            # Fill the flat bottom part
-            self._fill_flat_bottom_hires_triangle(
-                x0, y0, x1, y1, x3, y1, add_hires_pixel
-            )
-
-            # Fill the flat top part
-            self._fill_flat_top_hires_triangle(x1, y1, x3, y1, x2, y2, add_hires_pixel)
-
-        # Draw all hi-res pixels at once
-        if pixels:
-            self.set_hires_pixels(pixels, hires_mode, style)
-
-    def _fill_flat_bottom_hires_triangle(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        x2: float,
-        y1_dup: float,
-        add_pixel: Callable[[float, float], None],
-    ) -> None:
-        """Helper method to fill a flat-bottom triangle with hi-res precision (private method)."""
-        # Calculate slopes
-        height = y1 - y0
-        if abs(height) < 1e-6:
-            return
-
-        dx_left = (x1 - x0) / height
-        dx_right = (x2 - x0) / height
-
-        # Initialize scanline endpoints
-        x_left = x0
-        x_right = x0
-
-        # Calculate steps for smoother rendering (use more y steps for better quality)
-        y_steps = max(100, int(height * 10))
-        y_step = height / y_steps
-
-        # Scan from top to bottom
-        for i in range(y_steps + 1):
-            y = y0 + i * y_step
-
-            # Calculate scanline width
-            width = x_right - x_left
-
-            # Calculate steps for this scanline
-            x_steps = max(20, int(width * 10))
-            x_step = width / max(1, x_steps)
-
-            # Add pixels along scanline
-            for j in range(x_steps + 1):
-                x = x_left + j * x_step
-                add_pixel(x, y)
-
-            # Update scanline endpoints for next row
-            x_left += dx_left * y_step
-            x_right += dx_right * y_step
-
-    def _fill_flat_top_hires_triangle(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y0_dup: float,
-        x2: float,
-        y2: float,
-        add_pixel: Callable[[float, float], None],
-    ) -> None:
-        """Helper method to fill a flat-top triangle with hi-res precision (private method)."""
-        # Calculate slopes
-        height = y2 - y0
-        if abs(height) < 1e-6:
-            return
-
-        dx_left = (x2 - x0) / height
-        dx_right = (x2 - x1) / height
-
-        # Initialize scanline endpoints
-        x_left = x0
-        x_right = x1
-
-        # Calculate steps for smoother rendering (use more y steps for better quality)
-        y_steps = max(100, int(height * 10))
-        y_step = height / y_steps
-
-        # Scan from top to bottom
-        for i in range(y_steps + 1):
-            y = y0 + i * y_step
-
-            # Calculate scanline width
-            width = x_right - x_left
-
-            # Calculate steps for this scanline
-            x_steps = max(20, int(width * 10))
-            x_step = width / max(1, x_steps)
-
-            # Add pixels along scanline
-            for j in range(x_steps + 1):
-                x = x_left + j * x_step
-                add_pixel(x, y)
-
-            # Update scanline endpoints for next row
-            x_left += dx_left * y_step
-            x_right += dx_right * y_step
-
-    def draw_quad(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        x2: int,
-        y2: int,
-        x3: int,
-        y3: int,
-        style: str = "white",
-    ) -> None:
-        """Draw a quadrilateral outline using the specified style.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            x3: The x-coordinate of the fourth vertex.
-            y3: The y-coordinate of the fourth vertex.
-            style: The style to apply to the characters.
-        """
-        # Draw the four sides of the quadrilateral
-        self.draw_lines(
-            [(x0, y0, x1, y1), (x1, y1, x2, y2), (x2, y2, x3, y3), (x3, y3, x0, y0)],
-            "█",
-            style,
-        )
-
-    def draw_hires_quad(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        x2: float,
-        y2: float,
-        x3: float,
-        y3: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a high-resolution quadrilateral outline using the specified style.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            x3: The x-coordinate of the fourth vertex.
-            y3: The y-coordinate of the fourth vertex.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the characters.
-        """
-        # Draw the four sides of the quadrilateral with high-resolution
-        self.draw_hires_lines(
-            [(x0, y0, x1, y1), (x1, y1, x2, y2), (x2, y2, x3, y3), (x3, y3, x0, y0)],
-            hires_mode,
-            style,
-        )
-
-    def draw_filled_quad(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        x2: int,
-        y2: int,
-        x3: int,
-        y3: int,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled quadrilateral using the specified style.
-        Splits the quad into two triangles for filling.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            x3: The x-coordinate of the fourth vertex.
-            y3: The y-coordinate of the fourth vertex.
-            style: The style to apply to the characters.
-        """
-        # Draw the quad as two filled triangles
-        # First triangle (0, 1, 2)
-        self.draw_filled_triangle(x0, y0, x1, y1, x2, y2, style)
-        # Second triangle (0, 2, 3)
-        self.draw_filled_triangle(x0, y0, x2, y2, x3, y3, style)
-
-    def draw_filled_hires_quad(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        x2: float,
-        y2: float,
-        x3: float,
-        y3: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled high-resolution quadrilateral using the specified style.
-        Splits the quad into two triangles for filling.
-
-        Args:
-            x0: The x-coordinate of the first vertex.
-            y0: The y-coordinate of the first vertex.
-            x1: The x-coordinate of the second vertex.
-            y1: The y-coordinate of the second vertex.
-            x2: The x-coordinate of the third vertex.
-            y2: The y-coordinate of the third vertex.
-            x3: The x-coordinate of the fourth vertex.
-            y3: The y-coordinate of the fourth vertex.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the characters.
-        """
-        # Draw the quad as two filled high-resolution triangles
-        # First triangle (0, 1, 2)
-        self.draw_filled_hires_triangle(x0, y0, x1, y1, x2, y2, hires_mode, style)
-        # Second triangle (0, 2, 3)
-        self.draw_filled_hires_triangle(x0, y0, x2, y2, x3, y3, hires_mode, style)
-
-    def draw_rectangle_box(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        thickness: int = 1,
-        style: str = "white",
-    ) -> None:
-        """Draw a rectangle box with the specified thickness and style.
-
-        Args:
-            x0: The x-coordinate of the top-left corner.
-            y0: The y-coordinate of the top-left corner.
-            x1: The x-coordinate of the bottom-right corner.
-            y1: The y-coordinate of the bottom-right corner.
-            thickness: The thickness of the box.
-            style: The style to apply to the characters.
-        """
-        # (x0, y0)     (x1, y0)
-        #    ┌────────────┐
-        #    │            │
-        #    │            │
-        #    │            │
-        #    │            │
-        #    └────────────┘
-        # (x0, y1)     (x1, y1)
-
-        # NOTE: A difference of 0 between coordinates results in a
-        # width or height of 1 cell inside Textual.
-
-        T = thickness
-        x0, x1 = sorted((x0, x1))
-        y0, y1 = sorted((y0, y1))
-
-        # Both width and height are 1. This would just be a dot, so
-        # we don't draw anything.
-        if (x1 - x0 == 0) and (y1 - y0 == 0):
-            return
-
-        # We now know either the width or height must be higher than 2.
-        # Height is 1, place two horizontal line enders.
-        if y1 - y0 == 0:
-            self.set_pixel(x0, y0, char=get_box((0, T, 0, 0)), style=style)
-            self.set_pixel(x1, y0, char=get_box((0, 0, 0, T)), style=style)
-            if x1 - x0 >= 2:
-                # Width is greater than or equal to 3, draw a horizontal line
-                # between the line enders.
-                self.draw_line(
-                    x0 + 1, y0, x1 - 1, y1, char=get_box((0, T, 0, T)), style=style
-                )
-            return
-
-        # Width is 1, place two vertical line enders.
-        if x1 - x0 == 0:
-            self.set_pixel(x0, y0, char=get_box((0, 0, T, 0)), style=style)
-            self.set_pixel(x0, y1, char=get_box((T, 0, 0, 0)), style=style)
-            if y1 - y0 >= 2:
-                # Height is greater than or equal to 3, draw a horizontal line
-                # between the line enders.
-                self.draw_line(
-                    x0, y0 + 1, x1, y1 - 1, char=get_box((T, 0, T, 0)), style=style
-                )
-            return
-
-        # The remaining conditions require all the corner pieces to be drawn.
-        self.set_pixel(x0, y0, char=get_box((0, T, T, 0)), style=style)
-        self.set_pixel(x1, y0, char=get_box((0, 0, T, T)), style=style)
-        self.set_pixel(x1, y1, char=get_box((T, 0, 0, T)), style=style)
-        self.set_pixel(x0, y1, char=get_box((T, T, 0, 0)), style=style)
-
-        # If width and height are both 2, we don't need any lines. Only corners.
-        if (x1 - x0 == 1) and (y1 - y0 == 1):
-            return
-
-        # Width is greater than or equal to 3, draw horizontal lines.
-        if x1 - x0 >= 2:
-            for y in y0, y1:
-                self.draw_line(
-                    x0 + 1, y, x1 - 1, y, char=get_box((0, T, 0, T)), style=style
-                )
-        # Height is greater than or equal to 3, draw vertical lines.
-        if y1 - y0 >= 2:
-            for x in x0, x1:
-                self.draw_line(
-                    x, y0 + 1, x, y1 - 1, char=get_box((T, 0, T, 0)), style=style
-                )
-
-    def draw_filled_rectangle(
-        self,
-        x0: int,
-        y0: int,
-        x1: int,
-        y1: int,
-        char: str = "█",
-        style: str = "white",
-    ) -> None:
-        """Draw a filled rectangle using the specified character and style.
-
-        Args:
-            x0: The x-coordinate of the first corner.
-            y0: The y-coordinate of the first corner.
-            x1: The x-coordinate of the second corner.
-            y1: The y-coordinate of the second corner.
-            char: The character to draw.
-            style: The style to apply to the character.
-        """
+        """Fill the cells between two corner cells, inclusive."""
         x_start, x_end = sorted((x0, x1))
         y_start, y_end = sorted((y0, y1))
-
-        # Clip the rectangle to the canvas boundaries
-        canvas_width = self._canvas_region.width
-        canvas_height = self._canvas_region.height
-
-        clipped_x_start = max(x_start, 0)
-        clipped_y_start = max(y_start, 0)
-        clipped_x_end = min(x_end, canvas_width - 1)
-        clipped_y_end = min(y_end, canvas_height - 1)
-
-        # If the rectangle is completely outside the canvas, do nothing.
-        if clipped_x_start > clipped_x_end or clipped_y_start > clipped_y_end:
+        x_start, y_start = max(x_start, 0), max(y_start, 0)
+        x_end, y_end = min(x_end, self._width - 1), min(y_end, self._height - 1)
+        if x_start > x_end or y_start > y_end:
             return
-
-        fill_width = clipped_x_end - clipped_x_start + 1
-
-        char_row = [char] * fill_width
-        style_row = [style] * fill_width
-
-        for y in range(clipped_y_start, clipped_y_end + 1):
-            self._buffer[y][clipped_x_start : clipped_x_end + 1] = char_row
-            self._styles[y][clipped_x_start : clipped_x_end + 1] = style_row
-
-        self.refresh()
-
-    def draw_filled_hires_rectangle(
-        self,
-        x0: float,
-        y0: float,
-        x1: float,
-        y1: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled high-resolution rectangle using a hybrid approach.
-        The inner, full-cell part of the rectangle is drawn with solid
-        block characters for performance, while the fractional edges are
-        drawn with high-resolution pixels.
-
-        Args:
-            x0: The x-coordinate of the first corner.
-            y0: The y-coordinate of the first corner.
-            x1: The x-coordinate of the second corner.
-            y1: The y-coordinate of the second corner.
-            hires_mode: The high-resolution mode to use.
-            style: The style to apply to the characters.
-        """
-        x_start, x_end = sorted((x0, x1))
-        y_start, y_end = sorted((y0, y1))
-
-        if x_start == x_end and y_start == y_end:
-            self.set_hires_pixels([(x_start, y_start)], hires_mode, style)
-            return
-
-        hires_mode = hires_mode or self.default_hires_mode
-        pixel_size = hires_sizes[hires_mode]
-
-        # Round the fractional coordinates to hires pixel-precision
-        x_start = round(x_start * pixel_size.width) / pixel_size.width
-        x_end = round(x_end * pixel_size.width) / pixel_size.width
-        y_start = round(y_start * pixel_size.height) / pixel_size.height
-        y_end = round(y_end * pixel_size.height) / pixel_size.height
-
-        # Get the appropriate full-block character for the hires mode.
-        num_pixels = pixel_size.width * pixel_size.height
-        full_block_key = tuple([1] * num_pixels)
-        full_block_char = pixels[hires_mode][full_block_key]
-        assert isinstance(full_block_char, str)
-
-        # Define a helper to generate hires pixels for a given rectangular area.
-        def _get_hires_pixels_for_area(ax0, ay0, ax1, ay1):
-            if ax0 >= ax1 or ay0 >= ay1:
-                return []
-
-            _pixels = []
-            _width = ax1 - ax0
-            _height = ay1 - ay0
-            _x_steps = max(1, ceil(_width * pixel_size.width))
-            _y_steps = max(1, ceil(_height * pixel_size.height))
-
-            for i in range(_y_steps + 1):
-                py = ay0 + (i / _y_steps) * _height
-                for j in range(_x_steps + 1):
-                    px = ax0 + (j / _x_steps) * _width
-                    _pixels.append((px, py))
-            return _pixels
-
-        # coordinates for the inner full-cell rectangle
-        ix_start = ceil(x_start)
-        iy_start = ceil(y_start)
-        ix_end = floor(x_end)
-        iy_end = floor(y_end)
-
-        border_pixels = []
-
-        # If the rectangle is too thin to have a solid inner part,
-        # draw the whole thing with hires pixels.
-        if ix_start >= ix_end or iy_start >= iy_end:
-            border_pixels.extend(
-                _get_hires_pixels_for_area(x_start, y_start, x_end, y_end)
-            )
-        else:
-            # Draw the solid inner rectangle first (only for completely filled cells).
-            self.draw_filled_rectangle(
-                int(ix_start),
-                int(iy_start),
-                int(ix_end - 1),
-                int(iy_end - 1),
-                char=full_block_char,
-                style=style,
-            )
-
-            # Any cell touching a fractional boundary needs hires pixels.
-            # The layout is:
-            #   [      Top      ]
-            #   [L]  [inner]  [R]
-            #   [    Bottom     ]
-            #
-            # ix_start, etc. are the coordinates for the inner full-cell block.
-            # x_start etc. are the coordinates for the fractional parts of the
-            # rectangle.
-
-            # Use a small epsilon to avoid including boundary pixels that belong to adjacent cells
-            epsilon = 1e-9
-
-            # Top strip
-            if y_start < iy_start:
-                border_pixels.extend(
-                    _get_hires_pixels_for_area(
-                        x_start,
-                        y_start,
-                        x_end - epsilon,
-                        float(iy_start) - epsilon,
-                    )
-                )
-
-            # Bottom strip
-            if y_end > iy_end:
-                border_pixels.extend(
-                    _get_hires_pixels_for_area(
-                        x_start,
-                        float(iy_end),
-                        x_end - epsilon,
-                        y_end - epsilon,
-                    )
-                )
-
-            # Left strip
-            if x_start < ix_start:
-                border_pixels.extend(
-                    _get_hires_pixels_for_area(
-                        x_start,
-                        float(iy_start),
-                        float(ix_start) - epsilon,
-                        float(iy_end) - epsilon,
-                    )
-                )
-
-            # Right strip
-            if x_end > ix_end:
-                border_pixels.extend(
-                    _get_hires_pixels_for_area(
-                        float(ix_end),
-                        float(iy_start),
-                        x_end - epsilon,
-                        float(iy_end) - epsilon,
-                    )
-                )
-
-        if border_pixels:
-            self.set_hires_pixels(border_pixels, hires_mode, style)
-
-    def draw_filled_circle(
-        self, cx: int, cy: int, radius: int, style: str = "white"
-    ) -> None:
-        """Draw a filled circle using Bresenham's algorithm. Compensates for 2:1 aspect ratio.
-
-        Args:
-            cx (int): X-coordinate of the center of the circle.
-            cy (int): Y-coordinate of the center of the circle.
-            radius (int): Radius of the circle.
-            style (str): Style of the pixels to be drawn.
-        """
-        # Early rejection for invalid inputs
-        if radius <= 0:
-            return
-
-        # Initialize buffer to collect all pixels
-        pixels: list[tuple[int, int]] = []
-        pixels_append = pixels.append  # Local reference for faster calls
-
-        x = 0
-        y = radius
-        d = 3 - 2 * radius
-
-        # Pre-compute aspect ratio adjustments
-        max_iterations = radius * 2  # Safety limit
-        iteration = 0
-
-        while y >= x and iteration < max_iterations:
-            # Adjust y-coordinates to account for 2:1 aspect ratio
-            y1 = cy + (y + 1) // 2
-            y2 = cy + (x + 1) // 2
-            y3 = cy - x // 2
-            y4 = cy - y // 2
-
-            # Add horizontal lines of pixels
-            for xpos in range(cx - x, cx + x + 1):
-                pixels_append((xpos, y1))
-                pixels_append((xpos, y4))
-
-            for xpos in range(cx - y, cx + y + 1):
-                pixels_append((xpos, y2))
-                pixels_append((xpos, y3))
-
-            x += 1
-            if d > 0:
-                y -= 1
-                d = d + 4 * (x - y) + 10
-            else:
-                d = d + 4 * x + 6
-
-            iteration += 1
-
-        # Draw all pixels at once
-        if pixels:
-            self.set_pixels(pixels, "█", style)
-
-    def draw_filled_hires_circle(
-        self,
-        cx: float,
-        cy: float,
-        radius: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a filled circle, with high-resolution support.
-
-        Args:
-            cx (float): X-coordinate of the center of the circle.
-            cy (float): Y-coordinate of the center of the circle.
-            radius (float): Radius of the circle.
-            hires_mode (HiResMode): The high-resolution mode to use.
-            style (str): Style of the pixels to be drawn.
-        """
-        # Early rejection for invalid inputs
-        if radius <= 0:
-            return
-
-        # Constants and scaling factors
-        scale_x = 1
-        scale_y = 2
-        aspect_ratio = scale_x / scale_y
-
-        # Pre-compute values used in the inner loop
-        radius_squared = radius**2
-        inv_scale_x = 1.0 / scale_x
-        inv_scale_y_aspect = 1.0 / (scale_y * aspect_ratio)
-
-        # Determine the bounding box for the circle
-        y_min = int(-radius * scale_y)
-        y_max = int(radius * scale_y) + 1
-        x_min = int(-radius * scale_x)
-        x_max = int(radius * scale_x) + 1
-
-        # Initialize an empty list for collecting pixel coordinates
-        # (We calculate estimated_pixels only for the safety check below)
-        estimated_pixels = int(3.2 * radius * radius)  # 3.2 instead of π for safety
-        pixels: list[tuple[float, float]] = []
-        pixels_append = pixels.append  # Local reference for faster calls
-
-        # Use a more efficient scanning algorithm
-        # For each y, compute the range of valid x values directly
-        for y in range(y_min, y_max):
-            # Solve circle equation for x: (x/sx)² + (y/(sy*ar))² <= r²
-            y_term = (y * inv_scale_y_aspect) ** 2
-            if y_term > radius_squared:
-                continue  # Skip this row if y is outside the circle
-
-            x_term_max = radius_squared - y_term
-            if x_term_max < 0:
-                continue  # Skip if no valid x values
-
-            # Find the range of valid x values
-            x_radius = int((x_term_max**0.5) * scale_x)
-            x_start = max(x_min, -x_radius)
-            x_end = min(x_max, x_radius + 1)
-
-            # Add all points in this row in one go
-            for x in range(x_start, x_end):
-                pixels_append((cx + x * inv_scale_x, cy + y / scale_y))
-
-            # Safety check
-            if len(pixels) > estimated_pixels * 2:
-                break
-
-        # Render all pixels at once
-        self.set_hires_pixels(pixels, hires_mode, style)
-
-    def draw_circle(self, cx: int, cy: int, radius: int, style: str = "white") -> None:
-        """Draw a circle using Bresenham's algorithm. Compensates for 2:1 aspect ratio.
-
-        Args:
-            cx (int): X-coordinate of the center of the circle.
-            cy (int): Y-coordinate of the center of the circle.
-            radius (int): Radius of the circle.
-            style (str): Style of the pixels to be drawn.
-        """
-        # Early rejection for invalid inputs
-        if radius <= 0:
-            return
-
-        # Initialize buffer to collect all pixels
-        pixels: list[tuple[int, int]] = []
-        pixels_append = pixels.append  # Local reference for faster calls
-
-        x = radius
-        y = 0
-        decision = 1 - radius
-
-        # Pre-compute aspect ratio adjustments
-        max_iterations = radius * 2  # Safety limit
-        iteration = 0
-
-        while y <= x and iteration < max_iterations:
-            y_half = y // 2
-            x_half = x // 2
-
-            # Add all 8 points in each octant
-            pixels_append((cx + x, cy + y_half))
-            pixels_append((cx - x, cy + y_half))
-            pixels_append((cx + x, cy - y_half))
-            pixels_append((cx - x, cy - y_half))
-            pixels_append((cx + y, cy + x_half))
-            pixels_append((cx - y, cy + x_half))
-            pixels_append((cx + y, cy - x_half))
-            pixels_append((cx - y, cy - x_half))
-
-            y += 1
-            if decision <= 0:
-                decision += 2 * y + 1
-            else:
-                x -= 1
-                decision += 2 * (y - x) + 1
-
-            iteration += 1
-
-        # Draw all pixels at once
-        if pixels:
-            self.set_pixels(pixels, "█", style)
-
-    def draw_hires_circle(
-        self,
-        cx: float,
-        cy: float,
-        radius: float,
-        hires_mode: HiResMode | None = None,
-        style: str = "white",
-    ) -> None:
-        """Draw a circle with high-resolution support using Bresenham's algorithm. Compensates for 2:1 aspect ratio.
-
-        Args:
-            cx (float): X-coordinate of the center of the circle.
-            cy (float): Y-coordinate of the center of the circle.
-            radius (float): Radius of the circle.
-            hires_mode (HiResMode): The high-resolution mode to use.
-            style (str): Style of the pixels to be drawn.
-        """
-        # Early rejection for invalid inputs
-        if radius <= 0:
-            return
-
-        # Initialize an empty list for collecting pixel coordinates
-        # (We calculate estimated_size only for the safety check below)
-        estimated_size = int(
-            radius * 16
-        )  # Each step adds 8 pixels, estimate 4*radius steps
-        pixels: list[tuple[float, float]] = []
-        pixels_extend = pixels.extend  # Local reference for faster calls
-
-        # Pre-compute constants
-        scale_x = 1
-        scale_y = 2
-        aspect_ratio = scale_x / scale_y
-
-        # Midpoint circle algorithm with floating point precision
-        x: float = radius
-        y: float = 0
-        decision: float = 1 - radius
-
-        # Pre-compute points for each octant to avoid repeated calculations
-        def get_circle_points(x: float, y: float) -> list[tuple[float, float]]:
-            y_scaled = y * aspect_ratio
-            x_scaled = x * aspect_ratio
-            return [
-                (cx + x, cy + y_scaled),
-                (cx - x, cy + y_scaled),
-                (cx + x, cy - y_scaled),
-                (cx - x, cy - y_scaled),
-                (cx + y, cy + x_scaled),
-                (cx - y, cy + x_scaled),
-                (cx + y, cy - x_scaled),
-                (cx - y, cy - x_scaled),
-            ]
-
-        # Generate points for the circle
-        while y <= x:
-            # Add all 8 points at once
-            pixels_extend(get_circle_points(x, y))
-
-            # Update position
-            y += 0.5
-            if decision <= 0:
-                decision += 2 * y + 1
-            else:
-                x -= 0.5
-                decision += 2 * (y - x) + 1
-
-            # Safety check to avoid infinite loops
-            if len(pixels) > estimated_size:
-                break
-
-        # Render all pixels at once
-        self.set_hires_pixels(pixels, hires_mode, style)
+        width = x_end - x_start + 1
+        for y in range(y_start, y_end + 1):
+            self._chars[y][x_start : x_end + 1] = [char] * width
+            self._styles[y][x_start : x_end + 1] = [style] * width
 
     def write_text(
         self,
         x: int,
         y: int,
         text: str,
-        align: TextAlign = TextAlign.LEFT,
+        style: Style,
+        align: AlignHorizontal = "left",
     ) -> None:
-        """Write text to the canvas at the specified position, with support for markup.
+        """Write plain text, aligned on cell `x`, cropped to the canvas.
 
-        Args:
-            x (int): X-coordinate of the left edge of the text.
-            y (int): Y-coordinate of the baseline of the text.
-            text (str): Text to be written.
-            align (TextAlign): The alignment of the text within the canvas.
+        Centred text of even length sits one cell right of centre.
         """
-        if y < 0 or y >= self._canvas_size.height:
+        if not text or not 0 <= y < self._height:
+            return
+        if align == "right":
+            x -= len(text) - 1
+        elif align == "center":
+            half, odd = divmod(len(text), 2)
+            x -= half - (not odd)
+        for offset, char in enumerate(text):
+            self.set_cell(x + offset, y, char, style)
+
+    # ----------------------------------------------------------- points
+
+    def set_points(
+        self, points: Iterable[tuple[float, float]], hires_mode: HiResMode, style: Style
+    ) -> None:
+        """Light the sub-cell each point falls in.
+
+        A cell takes the glyph for the sub-cells lit by *this* call, replacing
+        whatever it showed before.
+        """
+        columns, rows = CELL_GRID[hires_mode]
+        glyphs = GLYPHS[hires_mode]
+        masks: dict[tuple[int, int], int] = {}
+        for x, y in points:
+            if not self.contains(floor(x), floor(y)):
+                continue
+            sub_x, sub_y = floor(x * columns), floor(y * rows)
+            cell = (sub_x // columns, sub_y // rows)
+            bit = (sub_y % rows) * columns + sub_x % columns
+            masks[cell] = masks.get(cell, 0) | 1 << bit
+        for (x, y), mask in masks.items():
+            if glyph := glyphs[mask]:
+                self.set_cell(x, y, glyph, style)
+
+    def draw_polyline(
+        self,
+        points: Sequence[tuple[float, float]],
+        hires_mode: HiResMode,
+        style: Style,
+    ) -> None:
+        """Draw lines between consecutive points, at sub-cell resolution."""
+        columns, rows = CELL_GRID[hires_mode]
+        lit: list[tuple[float, float]] = []
+        for (x0, y0), (x1, y1) in pairwise(points):
+            if (clipped := self._clip(x0, y0, x1, y1)) is None:
+                continue
+            cx0, cy0, cx1, cy1 = clipped
+            lit.extend(
+                (sub_x / columns, sub_y / rows)
+                for sub_x, sub_y in _line(
+                    floor(cx0 * columns),
+                    floor(cy0 * rows),
+                    floor(cx1 * columns),
+                    floor(cy1 * rows),
+                )
+            )
+        self.set_points(lit, hires_mode, style)
+
+    def fill_rect_hires(
+        self,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+        hires_mode: HiResMode,
+        style: Style,
+    ) -> None:
+        """Fill the area between two corner points, at sub-cell resolution.
+
+        Cells wholly inside are filled with full blocks; only the cells along
+        a fractional edge are worked out sub-cell by sub-cell.
+        """
+        x_start, x_end = sorted((x0, x1))
+        y_start, y_end = sorted((y0, y1))
+        if x_start == x_end and y_start == y_end:
+            self.set_points([(x_start, y_start)], hires_mode, style)
             return
 
-        # parse markup
-        rich_text = Text.from_markup(text)
-        # store plain text
-        if (plain_text := rich_text.plain) == "":
+        columns, rows = CELL_GRID[hires_mode]
+        # Snap to the sub-cell grid.
+        x_start = round(x_start * columns) / columns
+        x_end = round(x_end * columns) / columns
+        y_start = round(y_start * rows) / rows
+        y_end = round(y_end * rows) / rows
+
+        def area(ax0: float, ay0: float, ax1: float, ay1: float) -> list:
+            if ax0 >= ax1 or ay0 >= ay1:
+                return []
+            width, height = ax1 - ax0, ay1 - ay0
+            x_steps = max(1, ceil(width * columns))
+            y_steps = max(1, ceil(height * rows))
+            return [
+                (ax0 + (j / x_steps) * width, ay0 + (i / y_steps) * height)
+                for i in range(y_steps + 1)
+                for j in range(x_steps + 1)
+            ]
+
+        # The cells wholly inside.
+        ix_start, iy_start = ceil(x_start), ceil(y_start)
+        ix_end, iy_end = floor(x_end), floor(y_end)
+
+        if ix_start >= ix_end or iy_start >= iy_end:
+            # Too thin to have an inside: all edge.
+            self.set_points(area(x_start, y_start, x_end, y_end), hires_mode, style)
             return
-        # store styles for each individual character
-        rich_styles = []
-        for c in rich_text.divide(range(1, len(plain_text))):
-            style = Style()
-            for span in c._spans:
-                style += Style.parse(span.style)
-            rich_styles.append(style)
 
-        if align == TextAlign.RIGHT:
-            x -= len(plain_text) - 1
-        elif align == TextAlign.CENTER:
-            div, mod = divmod(len(plain_text), 2)
-            x -= div
-            if mod == 0:
-                # even number of characters, shift one to the right since I just
-                # like that better -- DF
-                x += 1
+        self.fill_rect(
+            ix_start, iy_start, ix_end - 1, iy_end - 1, GLYPHS[hires_mode][-1], style
+        )
+        # The edges, laid out as
+        #   [      top      ]
+        #   [L]  [inside]  [R]
+        #   [    bottom     ]
+        # each stopping just short of the next cell, which belongs to its
+        # neighbour.
+        epsilon = 1e-9
+        edges: list[tuple[float, float]] = []
+        if y_start < iy_start:
+            edges += area(x_start, y_start, x_end - epsilon, iy_start - epsilon)
+        if y_end > iy_end:
+            edges += area(x_start, iy_end, x_end - epsilon, y_end - epsilon)
+        if x_start < ix_start:
+            edges += area(x_start, iy_start, ix_start - epsilon, iy_end - epsilon)
+        if x_end > ix_end:
+            edges += area(ix_end, iy_start, x_end - epsilon, iy_end - epsilon)
+        if edges:
+            self.set_points(edges, hires_mode, style)
 
-        if x <= -len(plain_text) or x >= self._canvas_size.width:
-            # no part of text falls inside the canvas
-            return
+    # ---------------------------------------------------------- helpers
 
-        overflow_left = -x
-        overflow_right = x + len(plain_text) - self._canvas_size.width
-        if overflow_left > 0:
-            buffer_left = 0
-            text_left = overflow_left
-        else:
-            buffer_left = x
-            text_left = 0
-        if overflow_right > 0:
-            buffer_right = None
-            text_right = -overflow_right
-        else:
-            buffer_right = x + len(plain_text)
-            text_right = None
-
-        self._buffer[y][buffer_left:buffer_right] = plain_text[text_left:text_right]
-        self._styles[y][buffer_left:buffer_right] = [
-            str(s) for s in rich_styles[text_left:text_right]
-        ]
-        assert len(self._buffer[y]) == self._canvas_size.width
-        assert len(self._styles[y]) == self._canvas_size.width
-        self.refresh()
-
-    def _clip_line_cohen_sutherland(
+    def _clip(
         self, x0: float, y0: float, x1: float, y1: float
     ) -> tuple[float, float, float, float] | None:
-        """Clip line to canvas bounds using Cohen-Sutherland algorithm.
+        """Clip a line to the canvas (Cohen-Sutherland), or None if it misses."""
+        inside, left, right, below, above = 0, 1, 2, 4, 8
+        x_min, y_min = 0, 0
+        x_max, y_max = self._width - 1, self._height - 1
 
-        This algorithm efficiently determines if a line is completely outside the canvas,
-        completely inside, or needs to be clipped. It uses region codes to categorize
-        points and iteratively clips the line against the canvas boundaries.
-
-        Args:
-            x0: Starting point x coordinate
-            y0: Starting point y coordinate
-            x1: End point x coordinate
-            y1: End point y coordinate
-
-        Returns:
-            Tuple of clipped coordinates (x0, y0, x1, y1) if line intersects canvas,
-            None if line is completely outside canvas bounds.
-        """
-        # Region code constants
-        INSIDE = 0  # 0000
-        LEFT = 1  # 0001
-        RIGHT = 2  # 0010
-        BOTTOM = 4  # 0100
-        TOP = 8  # 1000
-
-        # Canvas boundaries
-        x_min = 0
-        y_min = 0
-        x_max = self._canvas_region.width - 1
-        y_max = self._canvas_region.height - 1
-
-        def compute_outcode(x: float, y: float) -> int:
-            """Compute region code for a point."""
-            code = INSIDE
+        def outcode(x: float, y: float) -> int:
+            code = inside
             if x < x_min:
-                code |= LEFT
+                code |= left
             elif x > x_max:
-                code |= RIGHT
+                code |= right
             if y < y_min:
-                code |= BOTTOM
+                code |= below
             elif y > y_max:
-                code |= TOP
+                code |= above
             return code
 
-        # Compute outcodes for both endpoints
-        outcode0 = compute_outcode(x0, y0)
-        outcode1 = compute_outcode(x1, y1)
-
+        code0, code1 = outcode(x0, y0), outcode(x1, y1)
         while True:
-            if outcode0 == 0 and outcode1 == 0:
-                # Both points inside - trivially accept
+            if not code0 | code1:
                 return x0, y0, x1, y1
-            elif (outcode0 & outcode1) != 0:
-                # Both points share an outside region - trivially reject
+            if code0 & code1:
                 return None
+            out = code0 or code1
+            if out & above:
+                x = x0 + (x1 - x0) * (y_max - y0) / (y1 - y0) if y1 != y0 else x0
+                y = y_max
+            elif out & below:
+                x = x0 + (x1 - x0) * (y_min - y0) / (y1 - y0) if y1 != y0 else x0
+                y = y_min
+            elif out & right:
+                y = y0 + (y1 - y0) * (x_max - x0) / (x1 - x0) if x1 != x0 else y0
+                x = x_max
             else:
-                # Line crosses boundary - find intersection point
-                # Pick a point that's outside
-                outcode_out = outcode0 if outcode0 != 0 else outcode1
-
-                # Find intersection point using line equation
-                # Avoid division by zero by checking if line is vertical/horizontal
-                if outcode_out & TOP:  # Point is above
-                    if y1 != y0:
-                        x = x0 + (x1 - x0) * (y_max - y0) / (y1 - y0)
-                    else:
-                        x = x0
-                    y = y_max
-                elif outcode_out & BOTTOM:  # Point is below
-                    if y1 != y0:
-                        x = x0 + (x1 - x0) * (y_min - y0) / (y1 - y0)
-                    else:
-                        x = x0
-                    y = y_min
-                elif outcode_out & RIGHT:  # Point is to the right
-                    if x1 != x0:
-                        y = y0 + (y1 - y0) * (x_max - x0) / (x1 - x0)
-                    else:
-                        y = y0
-                    x = x_max
-                else:  # LEFT - Point is to the left
-                    if x1 != x0:
-                        y = y0 + (y1 - y0) * (x_min - x0) / (x1 - x0)
-                    else:
-                        y = y0
-                    x = x_min
-
-                # Update the outside point and its outcode
-                if outcode_out == outcode0:
-                    x0, y0 = x, y
-                    outcode0 = compute_outcode(x0, y0)
-                else:
-                    x1, y1 = x, y
-                    outcode1 = compute_outcode(x1, y1)
-
-    def _get_line_coordinates(
-        self, x0: int, y0: int, x1: int, y1: int
-    ) -> list[tuple[int, int]]:
-        """Get all pixel coordinates on the line between two points.
-
-        Fast implementation of Bresenham's line algorithm.
-        Returns a list of coordinates instead of a generator for better performance.
-
-        Args:
-            x0: starting point x coordinate
-            y0: starting point y coordinate
-            x1: end point x coordinate
-            y1: end point y coordinate
-
-        Returns:
-            List of (x, y) coordinate tuples that make up the line.
-        """
-        # Early rejection if endpoints are identical
-        if x0 == x1 and y0 == y1:
-            return [(x0, y0)]
-
-        # Fast path for horizontal lines
-        if y0 == y1:
-            if x0 < x1:
-                return [(x, y0) for x in range(x0, x1 + 1)]
+                y = y0 + (y1 - y0) * (x_min - x0) / (x1 - x0) if x1 != x0 else y0
+                x = x_min
+            if out == code0:
+                x0, y0 = x, y
+                code0 = outcode(x0, y0)
             else:
-                return [(x, y0) for x in range(x1, x0 + 1)]
+                x1, y1 = x, y
+                code1 = outcode(x1, y1)
 
-        # Fast path for vertical lines
-        if x0 == x1:
-            if y0 < y1:
-                return [(x0, y) for y in range(y0, y1 + 1)]
-            else:
-                return [(x0, y) for y in range(y1, y0 + 1)]
 
-        # Initialize algorithm variables
-        dx = abs(x1 - x0)
-        sx = 1 if x0 < x1 else -1
-        dy = -abs(y1 - y0)
-        sy = 1 if y0 < y1 else -1
-        error = dx + dy
+def _line(x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
+    """The cells on a line between two cells, inclusive (Bresenham)."""
+    if y0 == y1:
+        return [(x, y0) for x in range(min(x0, x1), max(x0, x1) + 1)]
+    if x0 == x1:
+        return [(x0, y) for y in range(min(y0, y1), max(y0, y1) + 1)]
 
-        # Pre-allocate result list with known line length for efficiency
-        # The +1 ensures we have enough space for all points
-        max_points = max(abs(x1 - x0), abs(y1 - y0)) + 1
-        points = []
-        points.append((x0, y0))
-
-        # x and y are mutable copies so we can modify them
-        x, y = x0, y0
-
-        # Main loop - more efficient without generator overhead
-        while not (x == x1 and y == y1):
-            e2 = 2 * error
-            if e2 >= dy:
-                if x == x1:
-                    break
-                error += dy
-                x += sx
-            if e2 <= dx:
-                if y == y1:
-                    break
-                error += dx
-                y += sy
-            points.append((x, y))
-
-            # Safety check to avoid infinite loops
-            if len(points) > max_points:
+    dx, sx = abs(x1 - x0), 1 if x0 < x1 else -1
+    dy, sy = -abs(y1 - y0), 1 if y0 < y1 else -1
+    error = dx + dy
+    x, y = x0, y0
+    cells = [(x, y)]
+    while (x, y) != (x1, y1):
+        doubled = 2 * error
+        if doubled >= dy:
+            if x == x1:
                 break
-
-        return points
+            error += dy
+            x += sx
+        if doubled <= dx:
+            if y == y1:
+                break
+            error += dx
+            y += sy
+        cells.append((x, y))
+    return cells

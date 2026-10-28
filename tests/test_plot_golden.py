@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 from textual.app import App, ComposeResult
 
-from tcoda.plot import HiResMode, LegendLocation, PlotWidget
+from tcoda.plot import Plot
 
 GOLDEN = Path(__file__).parent / "plot_golden"
 UPDATE = bool(os.environ.get("TCODA_UPDATE_GOLDEN"))
@@ -31,28 +31,26 @@ XS = [i / 10 for i in range(100)]
 SINE = [math.sin(x) for x in XS]
 
 
-def _legend(plot: PlotWidget) -> None:
-    plot.set_xlabel("time (s)")
-    plot.set_ylabel("signal")
+def _legend(plot: Plot) -> None:
+    plot.x_label = "time (s)"
+    plot.y_label = "signal"
     plot.plot(XS, SINE, label="sine")
-    plot.scatter(XS[::7], SINE[::7], hires_mode=HiResMode.BRAILLE, label="samples")
-    plot.show_legend(LegendLocation.TOPRIGHT)
+    plot.scatter(XS[::7], SINE[::7], hires_mode="braille", label="samples")
+    plot.legend = "top-right"
 
 
-CASES: dict[str, Callable[[PlotWidget], None]] = {
+CASES: dict[str, Callable[[Plot], None]] = {
     "line": lambda plot: plot.plot(XS, SINE),
-    "line_braille": lambda plot: plot.plot(XS, SINE, hires_mode=HiResMode.BRAILLE),
+    "line_braille": lambda plot: plot.plot(XS, SINE, hires_mode="braille"),
     "scatter": lambda plot: plot.scatter(XS[::4], SINE[::4]),
     "scatter_halfblock": lambda plot: plot.scatter(
-        XS[::2], SINE[::2], hires_mode=HiResMode.HALFBLOCK
+        XS[::2], SINE[::2], hires_mode="halfblock"
     ),
-    "bar_quadrant": lambda plot: plot.bar(
-        [1, 2, 3], [1, 3, 2], hires_mode=HiResMode.QUADRANT
-    ),
+    "bar_quadrant": lambda plot: plot.bar([1, 2, 3], [1, 3, 2], hires_mode="quadrant"),
     "errorbar": lambda plot: plot.errorbar(
         [1, 2, 3], [1, 2, 1], xerr=[0.2] * 3, yerr=[0.3] * 3
     ),
-    "vline": lambda plot: (plot.plot(XS, SINE), plot.add_v_line(5.0)),
+    "vline": lambda plot: (plot.plot(XS, SINE), plot.vline(5.0)),
     "categorical": lambda plot: plot.bar(["red", "green", "blue"], [1, 3, 2]),
     "legend": _legend,
 }
@@ -60,7 +58,7 @@ CASES: dict[str, Callable[[PlotWidget], None]] = {
 
 class Harness(App[None]):
     def compose(self) -> ComposeResult:
-        yield PlotWidget()
+        yield Plot()
 
 
 def screen_text(app: App[None]) -> str:
@@ -73,7 +71,7 @@ async def test_the_plot_draws_as_recorded(name: str) -> None:
     app = Harness()
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        CASES[name](app.query_one(PlotWidget))
+        CASES[name](app.query_one(Plot))
         await pilot.pause()
         await pilot.pause()
         actual = screen_text(app)
