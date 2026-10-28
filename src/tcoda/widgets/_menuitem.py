@@ -59,10 +59,6 @@ class MenuItem(Widget):
     MenuItem { display: none; }
     """
 
-    #: Greyed out and unselectable. Reactive so a menu's availability can be
-    #: updated at any time; the dropdown reads it when it opens.
-    disabled: reactive[bool] = reactive(False)
-
     class Pressed(Message):
         """A menu item was chosen."""
 
@@ -109,7 +105,9 @@ class MenuItem(Widget):
                 app displays keys -- `App.get_key_display` -- so it matches
                 the footer. Purely a label -- the binding itself lives
                 wherever bindings live.
-            disabled: See the `disabled` reactive.
+            disabled: Greyed out and unselectable, as is every item of a
+                disabled `Menu`. The dropdown reads it when it opens, so it
+                can change at any time.
             action: A Textual action string ("app.quit", "pick_database"),
                 run against the screen as well as posting `Pressed`. It runs
                 inside `MenuBar`'s own worker, so an action that awaits
@@ -117,12 +115,11 @@ class MenuItem(Widget):
             name: The widget's name.
             classes: CSS classes.
         """
-        super().__init__(name=name, id=id, classes=classes)
+        super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.label = label
         self.mnemonic = mnemonic
         self.shortcut = shortcut
         self.action = action
-        self.set_reactive(MenuItem.disabled, disabled)
 
     @property
     def menu(self) -> Menu:
@@ -133,14 +130,14 @@ class MenuItem(Widget):
     def press(self) -> None:
         """Post `Pressed` as though the item had been chosen. `MenuBar` calls
         this; an app may too, to route a key binding through the same path."""
-        if self.disabled:
+        if self.is_disabled:
             return
         self.post_message(self.Pressed(self, self.menu))
 
     # ------------------------------------------------------------ rendering
 
     def _label_text(self, app: App) -> Text:
-        if self.mnemonic is None or self.disabled:
+        if self.mnemonic is None or self.is_disabled:
             return Text(self.label)
         return mnemonic_text(
             self.label, self.label.lower().find(self.mnemonic.lower()), app
@@ -182,6 +179,7 @@ class Menu(Static):
     }
     Menu:hover { background: $boost; }
     Menu.-armed { background: $boost; }
+    Menu:disabled { color: $text-disabled; }
     """
 
     #: Highlighted as the menu the bar is currently on.
@@ -234,7 +232,16 @@ class Menu(Static):
         self.watch(self.app, "theme", self._refresh_mnemonic_color, init=False)
 
     def _refresh_mnemonic_color(self, *_: object) -> None:
-        self.update(mnemonic_text(self.title_text, 0, self.app))
+        # Uncolored while disabled, as a disabled item's letter is.
+        if self.disabled:
+            self.update(Text(self.title_text))
+        else:
+            self.update(mnemonic_text(self.title_text, 0, self.app))
+
+    def watch_disabled(self, disabled: bool) -> None:
+        super().watch_disabled(disabled)
+        if self.is_mounted:
+            self._refresh_mnemonic_color()
 
     def watch_armed(self, armed: bool) -> None:
         self.set_class(armed, "-armed")

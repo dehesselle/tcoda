@@ -108,6 +108,12 @@ class MenuBar(Widget, can_focus=False):
         """The declared menus, left to right."""
         return [child for child in self.children if isinstance(child, Menu)]
 
+    @property
+    def enabled_menus(self) -> list[Menu]:
+        """The menus that can be opened, left to right: a disabled one, or
+        any in a disabled bar, is passed over by keys and mouse alike."""
+        return [menu for menu in self.menus if not menu.is_disabled]
+
     def menu(self, menu_id: str) -> Menu:
         """The menu with this id."""
         for menu in self.menus:
@@ -174,10 +180,13 @@ class MenuBar(Widget, can_focus=False):
         calls -- and because that is what lets an item's `action` run
         somewhere `push_screen_wait` is legal.
         """
-        if not self.menus:
+        menus = self.enabled_menus
+        if not menus:
             return
         if isinstance(menu, str):
             menu = self.menu(menu)
+        if menu is not None and menu not in menus:
+            return
         self.reveal()
         if self.auto_hide:
             # Reappearing changes layout (the rest of the screen gives back
@@ -186,9 +195,7 @@ class MenuBar(Widget, can_focus=False):
             await self._wait_for_layout()
         try:
             if menu is None:
-                menu = await self.app.push_screen_wait(
-                    MenuBarOverlay(self, self.menus[0])
-                )
+                menu = await self.app.push_screen_wait(MenuBarOverlay(self, menus[0]))
                 if menu is None:
                     return
             await self._run(menu)
@@ -204,14 +211,14 @@ class MenuBar(Widget, can_focus=False):
                 MenuDropdown(self, menu, x_offset=menu.region.x)
             )
             if isinstance(result, OpenNeighbor):
-                menus = self.menus
-                index = menus.index(menu)
+                menus = self.enabled_menus
+                index = menus.index(menu) if menu in menus else 0
                 menu = menus[(index + result.direction) % len(menus)]
                 continue
             if isinstance(result, Menu):
                 menu = result
                 continue
-            if isinstance(result, MenuItem) and not result.disabled:
+            if isinstance(result, MenuItem) and not result.is_disabled:
                 await self._chose(result)
             return
 

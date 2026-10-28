@@ -47,6 +47,10 @@ class MainScreen(Screen):
   Where the key *appears* is not the bar's business: pin it with
   [`Footer(pinned=(OPEN_ACTION,))`](Footer.md). Under a stock `Footer` it lands
   in focus-chain order like anything else.
+- **`disabled` works as it does on any Textual container.** A disabled
+  `MenuItem` is greyed out and cannot be chosen; a disabled `Menu` greys its
+  title, is passed over by arrows, mnemonics and the mouse, and disables
+  every item in it. `MenuBar.enabled_menus` lists the ones left to open.
 - **A shortcut is a key, not a label.** `shortcut=` is written the way a
   `Binding` key is (`"ctrl+s"`, `"f5"`, `"ctrl+k d s"`) and shown through
   `App.get_key_display` — `^s`, `f5`, `^k d s` by default — so it reads the

@@ -489,6 +489,66 @@ async def test_pressing_a_disabled_item_directly_does_nothing() -> None:
         assert app.pressed == []
 
 
+class ThreeMenus(App[None]):
+    """File, Edit and Help, with Edit disabled."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.pressed: list[str] = []
+
+    def compose(self) -> ComposeResult:
+        with MenuBar():
+            with Menu("File", id="file"):
+                yield MenuItem("Open...", id="open", mnemonic="o")
+            with Menu("Edit", id="edit", disabled=True):
+                yield MenuItem("Copy", id="copy", mnemonic="c")
+            with Menu("Help", id="help"):
+                yield MenuItem("About", id="about", mnemonic="a")
+
+    @on(MenuItem.Pressed)
+    def _record(self, event: MenuItem.Pressed) -> None:
+        self.pressed.append(event.item.id or "")
+
+
+async def test_arrowing_passes_over_a_disabled_menu() -> None:
+    app = ThreeMenus()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("right")
+        await settle(pilot)
+        assert app.query_one("#help", Menu).armed is True
+        assert app.query_one("#edit", Menu).armed is False
+
+
+async def test_a_disabled_menus_mnemonic_does_not_open_it() -> None:
+    app = ThreeMenus()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("f9")
+        await settle(pilot)
+        await pilot.press("e")
+        await settle(pilot)
+        assert isinstance(app.screen, MenuBarOverlay)
+
+
+async def test_a_disabled_menu_cannot_be_opened_by_name() -> None:
+    app = ThreeMenus()
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.query_one(MenuBar).open("edit")
+        await settle(pilot)
+        assert not isinstance(app.screen, MenuBarOverlay | MenuDropdown)
+
+
+async def test_the_items_of_a_disabled_menu_are_disabled() -> None:
+    app = ThreeMenus()
+    async with app.run_test(size=(80, 24)) as pilot:
+        copy = app.query_one("#copy", MenuItem)
+        assert copy.is_disabled
+        copy.press()
+        await pilot.pause()
+        assert app.pressed == []
+
+
 async def test_a_disabled_items_mnemonic_is_not_colored() -> None:
     app = Harness()
     async with app.run_test(size=(80, 24)) as pilot:

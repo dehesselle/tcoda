@@ -110,9 +110,15 @@ class MenuBarOverlay(_MenuStage[Menu | None]):
         self.dismiss(None)
 
     def action_move(self, direction: int) -> None:
-        menus = self._menu_bar.menus
-        index = menus.index(self._armed)
-        self._armed = menus[(index + direction) % len(menus)]
+        menus = self._menu_bar.enabled_menus
+        if not menus:
+            return
+        if self._armed in menus:
+            index = menus.index(self._armed)
+            self._armed = menus[(index + direction) % len(menus)]
+        else:
+            # Disabled while armed: start over from the first one left.
+            self._armed = menus[0]
         self._menu_bar.set_armed(self._armed)
 
     def action_open(self) -> None:
@@ -123,22 +129,23 @@ class MenuBarOverlay(_MenuStage[Menu | None]):
         if character is None or not character.isalpha():
             return
         letter = character.lower()
-        for menu in self._menu_bar.menus:
+        for menu in self._menu_bar.enabled_menus:
             if menu.mnemonic == letter:
                 event.stop()
                 self.dismiss(menu)
                 return
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
-        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        menu = _menu_at(self._menu_bar.enabled_menus, event.screen_offset)
         if menu is not None and menu is not self._armed:
             self._armed = menu
             self._menu_bar.set_armed(menu)
 
     def on_click(self, event: events.Click) -> None:
-        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        menu = _menu_at(self._menu_bar.enabled_menus, event.screen_offset)
         # A click off every title closes the bar, matching Escape -- there is
-        # nothing else on this screen a click could sensibly mean.
+        # nothing else on this screen a click could sensibly mean. A disabled
+        # title counts as off.
         self.dismiss(menu)
 
 
@@ -184,7 +191,7 @@ class MenuDropdown(_MenuStage[MenuDropdownResult]):
         content = [
             None
             if isinstance(entry, MenuSeparator)
-            else Option(entry.prompt(self.app), id=entry.id, disabled=entry.disabled)
+            else Option(entry.prompt(self.app), id=entry.id, disabled=entry.is_disabled)
             for entry in self._entries
         ]
         option_list = OptionList(*content)
@@ -216,7 +223,7 @@ class MenuDropdown(_MenuStage[MenuDropdownResult]):
         # above it is this screen's business.
         if self.query_one(OptionList).region.contains(*offset):
             return None
-        return _menu_at(self._menu_bar.menus, offset)
+        return _menu_at(self._menu_bar.enabled_menus, offset)
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         menu = self._title_at(event.screen_offset)
@@ -226,7 +233,7 @@ class MenuDropdown(_MenuStage[MenuDropdownResult]):
     def on_click(self, event: events.Click) -> None:
         if self.query_one(OptionList).region.contains(*event.screen_offset):
             return
-        menu = _menu_at(self._menu_bar.menus, event.screen_offset)
+        menu = _menu_at(self._menu_bar.enabled_menus, event.screen_offset)
         # Clicking the open menu's own title closes it, like clicking an
         # already-pressed toggle button; clicking a different title jumps to
         # it; clicking anywhere else (there is nothing else on this screen)
@@ -241,7 +248,7 @@ class MenuDropdown(_MenuStage[MenuDropdownResult]):
         for entry in self._entries:
             if (
                 isinstance(entry, MenuItem)
-                and not entry.disabled
+                and not entry.is_disabled
                 and entry.mnemonic is not None
                 and entry.mnemonic.lower() == letter
             ):
