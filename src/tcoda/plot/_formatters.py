@@ -259,10 +259,12 @@ _STEPS: list[tuple[_Unit, int, float]] = [
     *(("minutes", n, 60.0) for n in (1, 2, 5, 10, 15, 30)),
     *(("hours", n, 3600.0) for n in (1, 2, 3, 6, 12)),
     *(("days", n, 86400.0) for n in (1, 2)),
-    ("weeks", 1, 7 * 86400.0),
+    *(("weeks", n, 7 * 86400.0) for n in (1, 2)),
     *(("months", n, 30.44 * 86400) for n in (1, 3, 6)),
 ]
 _YEAR = 365.25 * 86400
+#: 1970-01-05, on the wall clock.
+_FIRST_MONDAY = _NAIVE_EPOCH + timedelta(days=4)
 
 
 class DateTimeFormatter(AxisFormatter):
@@ -363,7 +365,11 @@ def _floor(wall: datetime, unit: _Unit, count: int) -> datetime:
             # Counted from the first of the month, as a calendar would.
             return day.replace(day=(day.day - 1) // count * count + 1)
         case "weeks":
-            return day - timedelta(days=day.weekday())
+            monday = day - timedelta(days=day.weekday())
+            # Every other week counts from the first Monday after the epoch,
+            # so the same Mondays get ticks however the range moves.
+            weeks = (monday - _FIRST_MONDAY).days // 7
+            return monday - timedelta(weeks=weeks % count)
         case "months":
             return day.replace(month=(day.month - 1) // count * count + 1, day=1)
     # Round multiples of `count`; there was no year 0 to start from.

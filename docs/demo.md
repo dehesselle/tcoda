@@ -24,6 +24,7 @@ natural place. All of it is ordinary consumer code, so
 | [ConfirmDialog](dialogs/ConfirmDialog.md) | Dialogs → Confirm, and Delete files (the `danger=True, focus_cancel=True` variant, which deletes nothing). |
 | [Dialog](dialogs/Dialog.md) | Dialogs → Filter (F2): `FilterDialog`, the demo's own dialog on the shared chrome. |
 | [Plot](plot.md) | Dialogs → Sizes chart (`ctrl+k d p`): the browsed directory's KiB per extension. Categorical bars in the theme's first colour and a `$warning` mean line, with a legend you can drag. Wheel and drag zoom and pan; `r` resets. |
+| [Plot](plot.md) | Dialogs → Timeline (`ctrl+k d t`): a dot per file, when it last changed against its size, on a `DateTimeFormatter` axis. Only time zooms and pans (`pan_and_zoom="x"`), bounded by 1970 and now and no narrower than a minute, and the sizes fit what is in view. The line below counts the files in view on `RangeSettled` and reads out the point under the pointer with `data_at`. |
 | [AboutDialog](dialogs/AboutDialog.md) | Help → About: the demo's own about-text, with `$version` filled in through `variables=`. |
 | [SettingsDialog](dialogs/SettingsDialog.md) and [settings](settings.md) | File → Settings. The dotted `Demo.Refresh` and `Demo.Table` groups include a `choices=` setting and a `SettingAction`. Changes apply when the dialog closes. |
 

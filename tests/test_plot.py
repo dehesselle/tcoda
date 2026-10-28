@@ -853,7 +853,11 @@ class Settling(App[None]):
         self.settled.append(event)
 
 
-async def test_a_burst_of_moves_settles_once() -> None:
+async def test_a_burst_of_moves_settles_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Long enough that a slow test run cannot settle between the presses.
+    monkeypatch.setattr(Plot, "SETTLE_DELAY", 1.0)
     app = Settling()
     async with app.run_test(size=SIZE) as pilot:
         plot = app.query_one(Plot)
@@ -861,7 +865,7 @@ async def test_a_burst_of_moves_settles_once() -> None:
         plot.focus()
         await pilot.press("plus", "left", "left")
         assert app.settled == []
-        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        await pilot.pause(Plot.SETTLE_DELAY * 1.5)
         assert len(app.changed) == 3
         assert len(app.settled) == 1
         settled = app.settled[0]

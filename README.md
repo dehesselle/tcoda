@@ -45,7 +45,7 @@ where each component appears in it.
 | [tcoda.chords](docs/chords.md) | VSCode-style multi-key bindings (`ctrl+k ctrl+s`) via an App mixin |
 | [tcoda.terminal_title](docs/terminal_title.md) | Sets the terminal's window title and restores it on exit, via an App mixin |
 | [tcoda.settings](docs/settings.md) | Self-registering typed settings, persisted only when overridden |
-| [tcoda.plot](docs/plot.md) | Plot widget — line, scatter, bar, error bars — on a high-resolution canvas |
+| [tcoda.plot](docs/plot.md) | Plot widget — line, scatter, bar, error bars, date axes — that zooms and pans within limits, on a high-resolution canvas |
 | [tcoda.log_sink](docs/widgets/LogViewer.md#the-sink-tcodalog_sink) | In-memory `logging` handler behind `LogViewer` |
 | [tcoda.demo](docs/demo.md) | The demo app behind `python -m tcoda` |
 

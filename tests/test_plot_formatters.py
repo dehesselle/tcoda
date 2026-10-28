@@ -248,6 +248,18 @@ class TestDateTimeFormatter:
         ticks = DateTimeFormatter(UTC).get_ticks(START, START + 50 * DAY)
         assert {date.weekday() for date in utc_dates(ticks)} == {0}
 
+    def test_fortnights_fall_on_the_same_mondays_however_the_range_moves(self):
+        first_monday = datetime(1970, 1, 5, tzinfo=UTC)
+        parities = set()
+        for shift in (0, 3, 9, 20):
+            low = START + shift * DAY
+            ticks = DateTimeFormatter(UTC).get_ticks(low, low + 100 * DAY)
+            assert all(b - a == 14 * DAY for a, b in pairwise(ticks))
+            dates = utc_dates(ticks)
+            assert {date.weekday() for date in dates} == {0}
+            parities |= {(date - first_monday).days // 7 % 2 for date in dates}
+        assert len(parities) == 1
+
     def test_months_start_on_the_first(self):
         ticks = DateTimeFormatter(UTC).get_ticks(START, START + 200 * DAY)
         assert {date.day for date in utc_dates(ticks)} == {1}

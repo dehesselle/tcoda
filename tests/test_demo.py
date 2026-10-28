@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Tree
+from textual.widgets import Label, Tree
 
 from tcoda import settings as settings_module
 from tcoda.demo import DemoApp
@@ -16,6 +16,7 @@ from tcoda.demo._browser import FileTable, format_age, format_size
 from tcoda.demo._filter import FilterDialog
 from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
 from tcoda.demo._sizes import SizesDialog, sizes_by_extension
+from tcoda.demo._timeline import TimelineDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
 from tcoda.plot import Plot
 from tcoda.settings import config
@@ -106,6 +107,7 @@ async def test_a_hesitant_chord_shows_the_viewer_and_sorts() -> None:
         ("delete", ConfirmDialog),
         ("filter", FilterDialog),
         ("sizes", SizesDialog),
+        ("timeline", TimelineDialog),
         ("about", AboutDialog),
         ("settings", SettingsDialog),
     ],
@@ -132,6 +134,41 @@ async def test_the_sizes_chart_has_a_bar_per_extension() -> None:
         assert isinstance(app.screen, SizesDialog)
         axis = "".join(app.screen.query_one(Plot).query_one("#plot-x-axis")._chars[0])
         assert axis.split() == list(sizes_by_extension(files))
+
+
+async def test_the_timeline_counts_the_files_in_view_once_zooming_stops() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        total = len(app.screen._files)
+        await pilot.press("ctrl+k", "d", "t")
+        await pilot.pause()
+        assert isinstance(app.screen, TimelineDialog)
+        status = app.screen.query_one("#timeline-status", Label)
+        assert str(status.content) == f"{total} of {total} files in view"
+
+        plot = app.screen.query_one(Plot)
+        plot.focus()
+        before = plot.x_range
+        await pilot.press(*["plus"] * 30)
+        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        low, high = plot.x_range
+        assert high - low < before[1] - before[0]
+        in_view = sum(low <= info.modified <= high for info in app.screen._files)
+        assert str(status.content) == f"{in_view} of {total} files in view"
+
+
+async def test_the_timeline_reads_out_the_point_under_the_pointer() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+k", "d", "t")
+        await pilot.pause()
+        plot = app.screen.query_one(Plot)
+        canvas = plot.query_one("#plot-canvas")
+        await pilot.hover(canvas, offset=(10, 5))
+        status = str(app.screen.query_one("#timeline-status", Label).content)
+        assert status.endswith(" KiB")
 
 
 async def test_the_settings_dialog_lists_the_demo_groups() -> None:

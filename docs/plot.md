@@ -56,8 +56,8 @@ class MyApp(App[None]):
   `CategoricalFormatter`. Subclass `AxisFormatter` for anything else; only
   `get_ticks` and `get_labels` need writing.
 - **`DateTimeFormatter` puts ticks where a clock or calendar would**: every
-  15 minutes, on the hour, every 3 or 6 hours, at midnight, on Mondays, on the
-  first of the month or quarter, on round years. Its labels say only what
+  15 minutes, on the hour, every 3 or 6 hours, at midnight, on (every other)
+  Monday, on the first of the month or quarter, on round years. Its labels say only what
   changes: `21:00`, then `Nov 15` at midnight, then `03:00`. The first tick
   also carries the date (or the year). It shows local time unless given a
   `tz`, and it never raises, whatever the range: there are no ticks before
