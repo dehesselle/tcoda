@@ -846,16 +846,22 @@ class Plot(Widget, can_focus=True):
             )
 
     def _y_ticks_in_view(self, viewport: Viewport) -> list[tuple[int, str]]:
-        """The y ticks to draw, one per `Y_TICK_SPACING` rows at most, as
-        (row on the data canvas, label)."""
+        """The y ticks to draw, one per `Y_TICK_SPACING` rows at most, closer
+        where that would leave fewer than two in view, as (row on the data
+        canvas, label)."""
         low, high = viewport.y_range
         if self.y_ticks is not None:
             ticks = list(self.y_ticks)
-            labels = self.y_formatter.get_labels(ticks)
         else:
-            ticks, labels = self.y_formatter.get_ticks_and_labels(
-                low, high, max(1, viewport.region.height // self.Y_TICK_SPACING)
-            )
+            # Few intervals can mean a nice spacing wider than the range, which
+            # leaves its bottom tick alone; more of them narrow it.
+            height = viewport.region.height
+            most = max(1, height // self.Y_TICK_SPACING)
+            for max_ticks in range(most, max(most, height) + 1):
+                ticks = self.y_formatter.get_ticks(low, high, max_ticks)
+                if sum(low <= tick <= high for tick in ticks) >= 2:
+                    break
+        labels = self.y_formatter.get_labels(ticks)
         rows = []
         for tick, label in zip(ticks, labels):
             if not low <= tick <= high:

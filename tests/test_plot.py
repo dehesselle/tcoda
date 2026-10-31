@@ -372,6 +372,18 @@ async def test_y_ticks_follow_the_height() -> None:
     assert 1 < len(short) < len(tall)
 
 
+async def test_a_short_plot_keeps_a_y_tick_above_the_bottom() -> None:
+    app = Harness()
+    async with app.run_test(size=(80, 10)) as pilot:
+        plot = app.query_one(Plot)
+        # One or two intervals would space them 5 apart, past the top.
+        plot.y_limits = (0, 4.02)
+        await settle(pilot, plot)
+        labels = text_of(plot, "#plot-y-ticks").split()
+    assert len(labels) >= 2
+    assert labels[-1] == "0"
+
+
 async def test_rows_without_a_label_take_no_room() -> None:
     def heights(plot: Plot) -> tuple[int, int]:
         return (

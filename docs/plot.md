@@ -69,8 +69,10 @@ class MyApp(App[None]):
   is shorter. So zooming far out or in never grows the label column without
   end.
 - **Ticks fit the plot's size.** y gets one per `Y_TICK_SPACING` rows (3) at
-  most. x gets one per `X_TICK_SPACING` columns (8) at most, and fewer where
-  their labels would come closer than two cells. Both are class attributes.
+  most, and closer ones where that would leave fewer than two, so a short plot
+  still shows a value above its bottom. x gets one per `X_TICK_SPACING`
+  columns (8) at most, and fewer where their labels would come closer than two
+  cells. Both are class attributes.
   A label near either end is moved inside the plot rather than cut off.
 - **An end that follows the data goes `AUTO_MARGIN` (5%) past it**, so the
   highest and lowest values are not hidden under the frame. A fixed end goes
