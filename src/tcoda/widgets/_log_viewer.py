@@ -155,7 +155,7 @@ class LogViewer(Widget, can_focus=False):
         self._known_sources: dict[str, None] = {}  # insertion-ordered set
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="log-viewer-toolbar"):
+        with Horizontal(id="log-viewer-toolbar", disabled=not self.revealed):
             yield Select[int](
                 _LEVELS,
                 id="log-viewer-level",
@@ -172,7 +172,13 @@ class LogViewer(Widget, can_focus=False):
         # viewport width, requiring horizontal scrolling to read the rest --
         # painful for the very thing this exists to show in full, a long log
         # message. `RichLog` reflows onto further screen lines instead.
-        yield RichLog(id="log-viewer-log", wrap=True, highlight=False, markup=False)
+        yield RichLog(
+            id="log-viewer-log",
+            wrap=True,
+            highlight=False,
+            markup=False,
+            disabled=not self.revealed,
+        )
 
     # ------------------------------------------------------------- mounting
 
@@ -359,21 +365,16 @@ class LogViewer(Widget, can_focus=False):
 
     # ---------------------------------------------------------------- drive
 
-    def allow_focus_children(self) -> bool:
-        # Concealed means off-canvas (see the `offset` transition in
-        # DEFAULT_CSS, not `display`, so the slide animation still plays) --
-        # without this override Textual's focus chain doesn't know that and
-        # happily Tabs through the toolbar/log with nothing visible to show
-        # for it.
-        return self.revealed
-
     def watch_revealed(self) -> None:
         self.set_class(self.revealed, "-revealed")
-        if not self.revealed and self.screen.focused in self.query("*"):
-            # Concealing just made the focused widget unreachable by Tab and
-            # invisible -- leaving it focused would strand arrow/type keys on
-            # a widget the user can no longer see.
-            self.screen.set_focus(None)
+        # Concealed means off-canvas (see the `offset` transition in
+        # DEFAULT_CSS, not `display`, so the slide animation still plays), which
+        # Textual cannot tell from on-screen: the controls would still take the
+        # focus, by Tab, from code and as a screen's first focusable widget.
+        # Disabled, they cannot, and any that has it loses it.
+        # The children rather than `self`, whose `disabled` is the host's.
+        for child in self.children:
+            child.disabled = not self.revealed
 
     def reveal(self) -> None:
         self.revealed = True

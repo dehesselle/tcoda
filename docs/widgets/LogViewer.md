@@ -46,6 +46,14 @@ class MainScreen(Screen):
   sink's buffer — showing it again picks up everything that arrived while
   it was hidden. Lowering the level dropdown has no equivalent: a level
   suppressed upstream before you asked for it is gone for good.
+- **While concealed, it takes no focus**, whether by `Tab`, from code or as the
+  screen's first focusable widget, so it can be composed anywhere on a screen.
+  Concealing it while one of its controls has the focus leaves nothing focused,
+  as Textual does when a focused widget goes out of reach; `Tab` carries on
+  from the rest of the screen. Its controls are disabled for as long as it is
+  concealed, and keep up with the log all the same. The panel's own `disabled`
+  stays yours, and a panel disabled that way stays out of reach once revealed
+  too.
 
 ## The sink: `tcoda.log_sink`
 

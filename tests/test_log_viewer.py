@@ -17,7 +17,8 @@ import uuid
 import pytest
 from textual.app import App, ComposeResult
 from textual.pilot import Pilot
-from textual.widgets import RichLog, Select, Static
+from textual.screen import Screen
+from textual.widgets import Input, RichLog, Select, Static
 
 from tcoda.log_sink import InMemoryLogHandler
 from tcoda.widgets import TOGGLE_ACTION, LogViewer
@@ -595,19 +596,129 @@ async def test_revealed_panel_puts_its_controls_back_in_the_focus_chain(
         assert app.query_one("#log-viewer-log") in chain
 
 
-async def test_concealing_while_a_toolbar_control_is_focused_clears_focus(
+class FieldScreen(Screen[None]):
+    """A LogViewer composed ahead of something else that can take the focus,
+    so it would come first wherever the first focusable widget is wanted."""
+
+    def __init__(self, logger_name: str) -> None:
+        super().__init__()
+        self._logger_name = logger_name
+
+    def compose(self) -> ComposeResult:
+        yield LogViewer(logger=self._logger_name)
+        yield Input(id="field")
+
+
+class FieldHarness(App[None]):
+    """Pushes that screen rather than composing on the default one: auto-focus
+    runs again as a pushed screen resumes, when the panel's own controls exist.
+    On the default screen it only ever runs before they do."""
+
+    def __init__(self, logger_name: str) -> None:
+        super().__init__()
+        self._logger_name = logger_name
+
+    def on_mount(self) -> None:
+        self.push_screen(FieldScreen(self._logger_name))
+
+
+async def test_a_concealed_panel_does_not_take_the_initial_focus(
+    logger_name: str,
+) -> None:
+    app = FieldHarness(logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot)
+        assert app.focused is app.screen.query_one("#field", Input)
+
+
+async def test_a_concealed_panel_leaves_nothing_focused_if_it_is_all_there_is(
     logger_name: str,
 ) -> None:
     app = Harness(logger=logger_name)
     async with app.run_test(size=(80, 24)) as pilot:
-        await reveal(pilot)
-        app.query_one("#log-viewer-level", Select).focus()
         await pilot.pause()
-        assert app.screen.focused is app.query_one("#log-viewer-level", Select)
+        assert app.focused is None
 
-        await pilot.press("f1")
+
+async def test_a_concealed_panels_controls_cannot_be_focused_from_code(
+    logger_name: str,
+) -> None:
+    app = FieldHarness(logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
         await settle(pilot)
-        assert app.screen.focused is not app.query_one("#log-viewer-level", Select)
+        app.screen.query_one("#log-viewer-level", Select).focus()
+        await pilot.pause()
+        assert app.focused is app.screen.query_one("#field", Input)
+
+
+@pytest.mark.parametrize("control", ["#log-viewer-level", "#log-viewer-log"])
+async def test_concealing_takes_the_focus_away_from_the_panels_controls(
+    logger_name: str, control: str
+) -> None:
+    """Left there, keys would go to a widget the user can no longer see. Nothing
+    has the focus afterwards, as Textual leaves it when a focused widget goes out
+    of reach, and Tab carries on from the rest of the screen."""
+    app = FieldHarness(logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot)
+        panel = app.screen.query_one(LogViewer)
+        panel.reveal()
+        await settle(pilot)
+        panel.query_one(control).focus()
+        await pilot.pause()
+        assert app.focused is panel.query_one(control)
+
+        panel.conceal()
+        await settle(pilot)
+        assert app.focused is None
+
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.focused is app.screen.query_one("#field", Input)
+
+
+@pytest.mark.parametrize("disabled", [False, True])
+async def test_concealing_and_revealing_leave_the_panels_disabled_alone(
+    logger_name: str, disabled: bool
+) -> None:
+    """`disabled` is the host's switch. Concealing is a different reason for
+    the controls to be out of reach, and must not overwrite it."""
+    app = Harness(logger=logger_name, disabled=disabled)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        panel = app.query_one(LogViewer)
+        assert panel.disabled is disabled
+        panel.reveal()
+        await settle(pilot)
+        assert panel.disabled is disabled
+        panel.conceal()
+        await settle(pilot)
+        assert panel.disabled is disabled
+
+
+async def test_a_revealed_panel_the_host_disabled_stays_out_of_the_focus_chain(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name, disabled=True)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        app.query_one(LogViewer).reveal()
+        await settle(pilot)
+        assert app.query_one("#log-viewer-level") not in app.screen.focus_chain
+
+
+async def test_a_concealed_panel_keeps_up_with_the_log(logger_name: str) -> None:
+    """Being out of reach only concerns the user. Whatever is logged and
+    whatever the host sets while it is concealed is there when it is revealed."""
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        logging.getLogger(logger_name).warning("logged while concealed")
+        app.query_one(LogViewer).min_level = logging.WARNING
+        await settle(pilot)
+        assert "logged while concealed" in _log_text(app)
+        assert app.query_one("#log-viewer-level", Select).value == logging.WARNING
+        assert _sources_label(app) == "Sources (1/1)"
 
 
 # --------------------------------------------------------- handler/logger
