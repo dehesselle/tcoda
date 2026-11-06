@@ -25,12 +25,11 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import RichLog, Select
-from textual.widgets.selection_list import Selection
 
 from tcoda.log_sink import InMemoryLogHandler, LogEntry
 from tcoda.widgets._layers import install_layer
-from tcoda.widgets._multi_select import MultiSelect
 from tcoda.widgets._screen_keys import install_screen_key, uninstall_screen_key
+from tcoda.widgets._tree_select import TreeSelect
 
 if TYPE_CHECKING:
     from textual.screen import Screen
@@ -151,8 +150,10 @@ class LogViewer(Widget, can_focus=False):
         self._key_screen: Screen[Any]  # set at mount
         self._handler: InMemoryLogHandler  # set in _attach_handler, at mount
         self._owns_handler = False
+        # Derived from the checkboxes, which own the state, because every entry
+        # of a re-render asks and walking the tree each time would add up.
         self._hidden_sources: set[str] = set()
-        self._known_sources: dict[str, None] = {}  # insertion-ordered set
+        self._known_sources: set[str] = set()
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log-viewer-toolbar", disabled=not self.revealed):
@@ -163,7 +164,7 @@ class LogViewer(Widget, can_focus=False):
                 allow_blank=False,
                 compact=True,
             )
-            yield MultiSelect[str](
+            yield TreeSelect(
                 label=self._sources_label(),
                 compact=True,
                 id="log-viewer-sources",
@@ -195,18 +196,6 @@ class LogViewer(Widget, can_focus=False):
             show=self._show_key,
         )
         self._attach_handler()
-        sources = self.query_one("#log-viewer-sources", MultiSelect)
-        for entry in self._handler.entries():
-            if entry.source not in self._known_sources:
-                self._known_sources[entry.source] = None
-                sources.add_option(
-                    Selection(
-                        entry.source,
-                        entry.source,
-                        not self.is_source_hidden(entry.source),
-                    )
-                )
-        self._sync_sources_label()
         self._render_log()
         self._handler.subscribe(self._on_sink_entry)
 
@@ -272,6 +261,9 @@ class LogViewer(Widget, can_focus=False):
         log = self.query_one("#log-viewer-log", RichLog)
         log.clear()
         for entry in self._handler.entries():
+            # Replayed at mount, or here ahead of its own `_NewEntry`: a source
+            # not noted yet would pass, even beneath a hidden row.
+            self._note_source(entry.source)
             if self._passes(entry):
                 log.write(self._display_line(entry))
 
@@ -318,50 +310,46 @@ class LogViewer(Widget, can_focus=False):
     def _note_source(self, source: str) -> None:
         if source in self._known_sources:
             return
-        self._known_sources[source] = None
-        self._sync_sources_label()
-        self.query_one("#log-viewer-sources", MultiSelect).add_option(
-            Selection(source, source, True)
-        )
+        self._known_sources.add(source)
+        self.query_one("#log-viewer-sources", TreeSelect).add_option(source.split("."))
+        self._sync_hidden_sources()
 
     # --------------------------------------------------------------- sources UI
 
     def _sources_label(self) -> str:
         total = len(self._known_sources)
-        hidden = len(self._hidden_sources & self._known_sources.keys())
-        return f"Sources ({total - hidden}/{total})"
+        return f"Sources ({total - len(self._hidden_sources)}/{total})"
 
-    def _sync_sources_label(self) -> None:
-        self.query_one("#log-viewer-sources", MultiSelect).set_label(
-            self._sources_label()
-        )
+    def _sync_hidden_sources(self) -> None:
+        sources = self.query_one("#log-viewer-sources", TreeSelect)
+        self._hidden_sources = {
+            source
+            for source in self._known_sources
+            if not sources.is_checked(source.split("."))
+        }
+        sources.set_label(self._sources_label())
 
     def is_source_hidden(self, source: str) -> bool:
-        return source in self._hidden_sources
+        """Whether `source` is hidden, or would be if it appeared now."""
+        sources = self.query_one("#log-viewer-sources", TreeSelect)
+        return not sources.is_checked(source.split("."))
 
-    def on_multi_select_option_toggled(self, event: MultiSelect.OptionToggled) -> None:
-        if event.multi_select.id != "log-viewer-sources":
+    def on_tree_select_toggled(self, event: TreeSelect.Toggled) -> None:
+        if event.tree_select.id != "log-viewer-sources":
             return
         event.stop()
-        source = event.value
-        self.set_source_hidden(source, not event.multi_select.is_selected(source))
+        self._sync_hidden_sources()
+        self._render_log()
 
     def set_source_hidden(self, source: str, hidden: bool) -> None:
-        if hidden:
-            self._hidden_sources.add(source)
-        else:
-            self._hidden_sources.discard(source)
-        self._sync_sources_label()
+        """Hide or show `source` and everything beneath it in the dotted
+        hierarchy, including what appears there later. Takes any prefix, known
+        yet or not: `set_source_hidden("urllib3", True)`."""
+        self.query_one("#log-viewer-sources", TreeSelect).set_checked(
+            source.split("."), not hidden
+        )
+        self._sync_hidden_sources()
         self._render_log()
-        # Keeps the checkbox in sync with a *programmatic* call too (as used
-        # by several tests, and available to host apps) -- safe against
-        # feedback loops because `select`/`deselect` never re-fire
-        # `SelectionToggled`, only explicit user toggles do.
-        sources = self.query_one("#log-viewer-sources", MultiSelect)
-        if hidden:
-            sources.deselect(source)
-        else:
-            sources.select(source)
 
     # ---------------------------------------------------------------- drive
 

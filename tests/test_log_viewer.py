@@ -23,7 +23,7 @@ from textual.widgets import Input, RichLog, Select, Static
 from tcoda.log_sink import InMemoryLogHandler
 from tcoda.widgets import TOGGLE_ACTION, LogViewer
 from tcoda.widgets._log_viewer import _LAYER
-from tcoda.widgets._multi_select import MultiSelect, MultiSelectOverlay
+from tcoda.widgets._tree_select import TreeSelect, TreeSelectOverlay
 
 
 class Harness(App[None]):
@@ -62,7 +62,7 @@ def _log_text(app: App[None]) -> str:
 
 
 def _sources_label(app: App[None]) -> str:
-    return app.query_one("#log-viewer-sources", MultiSelect).label
+    return app.query_one("#log-viewer-sources", TreeSelect).label
 
 
 async def settle(pilot: Pilot[None], rounds: int = 3) -> None:
@@ -345,6 +345,146 @@ async def test_a_filtered_out_live_entry_never_reaches_the_log_widget(
         assert "should-stay-hidden-for-now" in _log_text(app)
 
 
+async def test_hiding_a_parent_hides_its_existing_sources_and_later_ones(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        _source(logger_name, "lib.a").info("from-a")
+        _source(logger_name, "ours").info("from-ours")
+        await settle(pilot)
+
+        app.query_one(LogViewer).set_source_hidden(f"{logger_name}.lib", True)
+        await settle(pilot)
+        assert "from-a" not in _log_text(app)
+
+        _source(logger_name, "lib.b").info("from-b")
+        _source(logger_name, "lib.deep.er").info("from-deeper")
+        _source(logger_name, "ours").info("more-from-ours")
+        await settle(pilot)
+        assert "from-b" not in _log_text(app)
+        assert "from-deeper" not in _log_text(app)
+        assert "from-ours" in _log_text(app)
+        assert "more-from-ours" in _log_text(app)
+
+
+async def test_a_prefix_can_be_hidden_before_any_of_its_sources_appear(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        viewer = app.query_one(LogViewer)
+        viewer.set_source_hidden(f"{logger_name}.lib", True)
+        assert viewer.is_source_hidden(f"{logger_name}.lib.a")
+
+        _source(logger_name, "lib.a").info("from-a")
+        await settle(pilot)
+        assert "from-a" not in _log_text(app)
+        assert _sources_label(app) == "Sources (0/1)"
+
+
+async def test_a_re_render_keeps_a_new_source_of_a_hidden_parent_hidden(
+    logger_name: str,
+) -> None:
+    """The buffer has the entry before the panel has heard of its source, so a
+    re-render can reach it first."""
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        viewer = app.query_one(LogViewer)
+        viewer.set_source_hidden(f"{logger_name}.lib", True)
+
+        _source(logger_name, "lib.late").info("from-late")
+        viewer.set_source_hidden(f"{logger_name}.other", True)
+        await settle(pilot)
+        assert "from-late" not in _log_text(app)
+
+
+async def test_rechecking_one_child_of_a_hidden_parent_shows_only_that_child(
+    logger_name: str,
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        _source(logger_name, "lib.a").info("from-a")
+        _source(logger_name, "lib.b").info("from-b")
+        await settle(pilot)
+
+        viewer = app.query_one(LogViewer)
+        viewer.set_source_hidden(f"{logger_name}.lib", True)
+        viewer.set_source_hidden(f"{logger_name}.lib.a", False)
+        await settle(pilot)
+        assert "from-a" in _log_text(app)
+        assert "from-b" not in _log_text(app)
+
+
+async def test_a_source_that_is_also_a_parent_filters_its_own_lines_too(
+    logger_name: str,
+) -> None:
+    """A logger can both write and have children, as `tcoda.demo` does."""
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        _source(logger_name, "lib").info("from-parent")
+        _source(logger_name, "lib.child").info("from-child")
+        await settle(pilot)
+
+        viewer = app.query_one(LogViewer)
+        viewer.set_source_hidden(f"{logger_name}.lib", True)
+        await settle(pilot)
+        assert "from-parent" not in _log_text(app)
+        assert "from-child" not in _log_text(app)
+
+        viewer.set_source_hidden(f"{logger_name}.lib.child", False)
+        await settle(pilot)
+        assert "from-parent" not in _log_text(app)
+        assert "from-child" in _log_text(app)
+
+
+async def test_toggling_a_group_row_filters_the_log(logger_name: str) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        _source(logger_name, "a").info("from-a")
+        await settle(pilot)
+        await reveal(pilot)
+        await pilot.click("#log-viewer-sources")
+        await settle(pilot)
+
+        # The cursor starts on the only top-level row, the group `logger_name`.
+        await pilot.press("space")
+        await settle(pilot)
+        assert "from-a" not in _log_text(app)
+        assert _sources_label(app) == "Sources (0/1)"
+
+
+async def test_a_replayed_source_appears_in_the_tree(logger_name: str) -> None:
+    """Logged before `LogViewer` existed, through a sink it is handed."""
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.INFO)
+    handler = InMemoryLogHandler()
+    logger.addHandler(handler)
+    _source(logger_name, "early.bird").info("from-before-mount")
+
+    class HandlerHarness(App[None]):
+        def compose(self) -> ComposeResult:
+            yield LogViewer(handler=handler)
+
+    app = HandlerHarness()
+    try:
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            viewer = app.query_one(LogViewer)
+            viewer.set_source_hidden(f"{logger_name}.early", True)
+            await settle(pilot)
+            assert "from-before-mount" not in _log_text(app)
+            assert _sources_label(app) == "Sources (0/1)"
+    finally:
+        logger.removeHandler(handler)
+
+
 async def test_log_entries_arriving_off_the_ui_thread_still_render(
     logger_name: str,
 ) -> None:
@@ -375,12 +515,12 @@ async def test_a_newly_discovered_source_is_added_to_the_open_popup_checked(
         await reveal(pilot)
         await pilot.click("#log-viewer-sources")
         await settle(pilot)
-        sources = app.query_one("#log-viewer-sources", MultiSelect)
+        sources = app.query_one("#log-viewer-sources", TreeSelect)
         assert sources.expanded is True
 
         _source(logger_name, "b").info("second-source-line")
         await settle(pilot)
-        assert sources.is_selected(f"{logger_name}.b")
+        assert sources.is_checked([logger_name, "b"])
 
 
 async def test_the_popup_stays_open_across_multiple_toggles(logger_name: str) -> None:
@@ -394,14 +534,16 @@ async def test_the_popup_stays_open_across_multiple_toggles(logger_name: str) ->
         await pilot.click("#log-viewer-sources")
         await settle(pilot)
 
-        sources = app.query_one("#log-viewer-sources", MultiSelect)
-        overlay = sources.query_one(MultiSelectOverlay)
-        overlay.toggle(f"{logger_name}.a")
+        sources = app.query_one("#log-viewer-sources", TreeSelect)
+        overlay = sources.query_one(TreeSelectOverlay)
+        await pilot.press("right", "down", "space")
         await settle(pilot)
+        assert not overlay.is_checked([logger_name, "a"])
         assert sources.expanded is True
 
-        overlay.toggle(f"{logger_name}.b")
+        await pilot.press("down", "space")
         await settle(pilot)
+        assert not overlay.is_checked([logger_name, "b"])
         assert sources.expanded is True
 
 
@@ -416,7 +558,7 @@ async def test_escape_closes_the_popup_without_changing_selection(
         await reveal(pilot)
         await pilot.click("#log-viewer-sources")
         await settle(pilot)
-        sources = app.query_one("#log-viewer-sources", MultiSelect)
+        sources = app.query_one("#log-viewer-sources", TreeSelect)
         assert sources.expanded is True
 
         await pilot.press("escape")
@@ -438,7 +580,7 @@ async def test_clicking_a_different_toolbar_control_closes_the_popup(
         await reveal(pilot)
         await pilot.click("#log-viewer-sources")
         await settle(pilot)
-        sources = app.query_one("#log-viewer-sources", MultiSelect)
+        sources = app.query_one("#log-viewer-sources", TreeSelect)
         assert sources.expanded is True
 
         await pilot.click("#log-viewer-level")
@@ -462,6 +604,19 @@ async def test_the_trigger_label_shows_visible_over_known_count(
         assert _sources_label(app) == "Sources (2/3)"
 
 
+async def test_the_trigger_label_counts_sources_rather_than_group_rows(
+    logger_name: str,
+) -> None:
+    """The `logger_name` and `lib` rows exist only to hold the two below."""
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        _source(logger_name, "lib.a").info("line-a")
+        _source(logger_name, "lib.b").info("line-b")
+        await settle(pilot)
+        assert _sources_label(app) == "Sources (2/2)"
+
+
 async def test_the_trigger_arrow_points_up_only_while_the_popup_is_open(
     logger_name: str,
 ) -> None:
@@ -471,7 +626,7 @@ async def test_the_trigger_arrow_points_up_only_while_the_popup_is_open(
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await reveal(pilot)
-        sources = app.query_one("#log-viewer-sources", MultiSelect)
+        sources = app.query_one("#log-viewer-sources", TreeSelect)
         assert sources.has_class("-expanded") is False
 
         await pilot.click("#log-viewer-sources")

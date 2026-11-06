@@ -32,7 +32,7 @@ from tcoda.widgets import (
     TabbedContent,
     TabPane,
 )
-from tcoda.widgets._multi_select import MultiSelect
+from tcoda.widgets._tree_select import TreeSelect
 
 WIDGETS: list[Callable[..., Widget]] = [
     MenuBar,
@@ -46,7 +46,7 @@ WIDGETS: list[Callable[..., Widget]] = [
     Countdown,
     LogViewer,
     ChordViewer,
-    MultiSelect,
+    TreeSelect,
     DataTable,
     TabbedContent,
     lambda **kwargs: TabPane("Tab", **kwargs),

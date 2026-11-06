@@ -3,7 +3,7 @@
 A panel that slides down from the top over existing content, showing the
 last 30,000 lines a program has written through the stdlib `logging` module
 — no logfile, no tailing. A level dropdown (default: info and above) and a
-per-source checklist (default: all sources visible) narrow what's shown.
+tree of sources with checkboxes (default: all visible) narrow what's shown.
 
 ```python
 from tcoda.widgets import LogViewer
@@ -40,12 +40,29 @@ class MainScreen(Screen):
   `TOGGLE_ACTION`). A second `LogViewer` on the same screen needs `key=None`
   and is toggled through its own `toggle()`; asking for a key raises at
   mount.
-- **Sources are logger names (`record.name`), discovered live** — the
-  checklist grows as new ones appear, defaulting to visible. Hiding a
-  source stops new lines from it reaching the panel, but they stay in the
-  sink's buffer — showing it again picks up everything that arrived while
-  it was hidden. Lowering the level dropdown has no equivalent: a level
-  suppressed upstream before you asked for it is gone for good.
+- **Sources are logger names (`record.name`), discovered live** — the tree
+  grows as new ones appear, defaulting to visible. Hiding a source stops new
+  lines from it reaching the panel, but they stay in the sink's buffer —
+  showing it again picks up everything that arrived while it was hidden.
+  Lowering the level dropdown has no equivalent: a level suppressed upstream
+  before you asked for it is gone for good.
+- **The tree follows the dots in the names, as `logging`'s own hierarchy
+  does**, so a library's many loggers sit under one row, collapsed at first,
+  with the rows of each level sorted by name.
+  `space`, `enter` or a click toggles a row and everything beneath it; `right`,
+  `left` or a click on the arrow expands and collapses. The trigger's count
+  covers sources only, not rows that merely group them. A row whose sources
+  disagree shows `-`, and toggling it shows them all.
+- **A new source takes the state of its parent row**, so a hidden `urllib3`
+  keeps hiding a `urllib3.connectionpool` that first logs later. Unchecking
+  every child one by one doesn't count: only a decision about the row itself
+  covers what comes later.
+- **`set_source_hidden(name, hidden)` does what toggling a row does**, from
+  code, and takes any prefix, whether or not anything has logged under it yet.
+  A prefix nothing has logged under gets a row of its own, which stays.
+  `is_source_hidden(name)` answers the same way for a source yet to appear.
+  Both work once the panel is mounted, so a host's `on_mount` is the place to
+  hide something from the start.
 - **While concealed, it takes no focus**, whether by `Tab`, from code or as the
   screen's first focusable widget, so it can be composed anywhere on a screen.
   Concealing it while one of its controls has the focus leaves nothing focused,
