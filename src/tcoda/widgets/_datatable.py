@@ -41,14 +41,24 @@ rather than a recipe:
 * `DataTable` leaves `hover_coordinate` untouched when the mouse is over filler
   space carrying no row/column meta, so a tooltip set over a real cell would
   never get the reactive change needed to clear it again.
+
+`to_csv` hands back everything the table holds, as a string: headers without
+their indicator, every row in display order, and each cell's whole value or,
+with `tooltips=True`, its tooltip. Binding a key to it and saving the result are
+the app's business.
 """
 
 from __future__ import annotations
 
+import csv
+import io
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from rich.protocol import is_renderable
 from rich.text import Text
 from textual import events
+from textual.content import Content
+from textual.markup import MarkupError
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import DataTable as TextualDataTable
@@ -78,9 +88,44 @@ def _orderable(value: Any) -> Any:
     return value
 
 
+def _cell_text(value: object) -> str:
+    """The whole of a cell's value as text, without its styling.
+
+    Deliberately not what Textual paints: its formatter cuts a `str` to the row
+    height and rounds a float to two places. A `str` is still parsed as markup,
+    so tags used for styling stay out of the result, though without replacing
+    emoji codes, which would change the value rather than style it.
+
+    Empty for a renderable with no text of its own, such as a Rich `Panel`:
+    `str()` would export `<rich.panel.Panel object at 0x...>`.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, Text | Content):
+        return value.plain
+    if isinstance(value, str):
+        return Text.from_markup(value, emoji=False).plain
+    return "" if is_renderable(value) else str(value)
+
+
+def _tooltip_text(tooltip: object) -> str | None:
+    """The text of a tooltip, or None for one that has no text to export.
+
+    A `str` is parsed as markup because that is how a tooltip renders. Markup
+    that does not parse stays literal: a hover evaluates one tooltip but an
+    export evaluates them all, and one bad row must not lose the whole export.
+    """
+    if isinstance(tooltip, str):
+        try:
+            return Content.from_markup(tooltip).plain
+        except MarkupError:
+            return tooltip
+    return tooltip.plain if isinstance(tooltip, Text | Content) else None
+
+
 class DataTable(TextualDataTable[Any]):
-    """Textual's `DataTable`, plus sortable headers and per-cell and per-header
-    tooltips."""
+    """Textual's `DataTable`, plus sortable headers, per-cell and per-header
+    tooltips, and CSV export."""
 
     #: The sort indicators, deliberately not configurable: one look across
     #: every app that uses this. All three are one cell wide, which is what
@@ -416,3 +461,56 @@ class DataTable(TextualDataTable[Any]):
         meta = event.style.meta
         if not meta or meta.get("out_of_bounds", False):
             self.tooltip = None
+
+    # ---------------------------------------------------------------- export
+
+    def to_csv(self, *, delimiter: str = ",", tooltips: bool = False) -> str:
+        """Everything the table holds, as CSV text.
+
+        Every row and column is included, whether or not it is scrolled into
+        view, in display order. The header row is always written, whether or
+        not `show_header` is on. Row labels, when shown, become a leading column
+        under an empty header.
+
+        Lines end in a bare `\\n`, not the `\\r\\n` `csv` defaults to: saving
+        through a text-mode file, as `App.deliver_text` does, turns that into
+        `\\r\\r\\n` on Windows, a blank row after every line in a spreadsheet.
+
+        Args:
+            delimiter: The column separator, one character.
+            tooltips: Export a cell's tooltip rather than its text wherever
+                `get_cell_tooltip` returns one, for a table whose tooltips hold
+                the full value behind an abbreviated cell. They are exported as
+                they are, so leave this off for tooltips that say something
+                else about the cell.
+
+        Returns:
+            The CSV text.
+        """
+        # Rows added since the last idle have not been folded into the sort yet.
+        if self._resort_pending:
+            self._resort()
+        columns = self.ordered_columns
+        labelled = self._should_render_row_labels
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
+        header = [
+            _cell_text(self._sort_labels.get(column.key, column.label))
+            for column in columns
+        ]
+        writer.writerow(["", *header] if labelled else header)
+        for row in self.ordered_rows:
+            fields = [
+                self._export_field(row.key, column.key, tooltips) for column in columns
+            ]
+            writer.writerow([_cell_text(row.label), *fields] if labelled else fields)
+        return buffer.getvalue()
+
+    def _export_field(
+        self, row_key: RowKey, column_key: ColumnKey, tooltips: bool
+    ) -> str:
+        if tooltips:
+            text = _tooltip_text(self.get_cell_tooltip(row_key, column_key))
+            if text is not None:
+                return text
+        return _cell_text(self.get_cell(row_key, column_key))

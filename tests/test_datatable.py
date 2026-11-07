@@ -2,8 +2,8 @@
 #
 # SPDX-License-Identifier: 0BSD
 
-"""The table: sort state and its indicators, who orders the rows, and the
-per-cell and per-header tooltips.
+"""The table: sort state and its indicators, who orders the rows, the per-cell
+and per-header tooltips, and the CSV export.
 
 The hover tests go through a real mouse position rather than assigning to
 `hover_coordinate`, because two of the things worth pinning down here -- a
@@ -13,10 +13,19 @@ are precisely the cases where the coordinate does *not* change.
 
 from __future__ import annotations
 
+import asyncio
+import codecs
+import csv
+import io
+from pathlib import Path
+from typing import Any
+
 import pytest
 from rich.cells import cell_len
+from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
+from textual.content import Content
 from textual.coordinate import Coordinate
 from textual.widgets.data_table import ColumnKey, RowKey
 
@@ -596,3 +605,309 @@ async def test_clearing_the_columns_drops_every_header_tooltip() -> None:
         for column in range(3):
             await hover_header(pilot, table, column)
             assert table.tooltip is None
+
+
+# --------------------------------------------------------------------- export
+
+
+def parse(text: str, delimiter: str = ",") -> list[list[str]]:
+    # `newline=""` so a line break inside a quoted field reaches `csv.reader`
+    # as it was written.
+    return list(csv.reader(io.StringIO(text, newline=""), delimiter=delimiter))
+
+
+async def test_the_export_headers_never_carry_a_sort_indicator() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate(table)
+        await pilot.pause()
+        assert parse(table.to_csv())[0] == ["Name", "Size", "Note"]
+        table.sort_by("name")
+        await pilot.pause()
+        assert parse(table.to_csv())[0] == ["Name", "Size", "Note"]
+        table.sort_by("name", reverse=True)
+        await pilot.pause()
+        assert parse(table.to_csv())[0] == ["Name", "Size", "Note"]
+
+
+async def test_the_header_row_is_written_even_when_the_header_is_hidden() -> None:
+    table = DataTable(show_header=False)
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        populate(table)
+        await pilot.pause()
+        assert parse(table.to_csv())[0] == ["Name", "Size", "Note"]
+
+
+async def test_the_export_follows_the_display_order() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate(table)
+        table.sort_by("size", reverse=True)
+        await pilot.pause()
+        assert [row[0] for row in parse(table.to_csv())[1:]] == [
+            "charlie",
+            "Alpha",
+            "bravo",
+        ]
+
+
+async def test_rows_added_just_before_an_export_are_in_sort_order() -> None:
+    """They would otherwise wait for the next idle to be folded into the sort,
+    which an export in the same handler does not reach."""
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate(table)
+        table.sort_by("name")
+        await pilot.pause()
+        table.add_row(Text("bravissimo"), Text("1 B"), Text("note"), key="z")
+        assert [row[0] for row in parse(table.to_csv())[1:]] == [
+            "Alpha",
+            "bravissimo",
+            "bravo",
+            "charlie",
+        ]
+
+
+async def test_rows_and_columns_scrolled_out_of_view_are_exported() -> None:
+    """The table is 60 by 10, so nearly all of this is out of view."""
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        for column in range(20):
+            table.add_column(f"C{column}", width=8)
+        for row in range(100):
+            table.add_row(*(Text(f"{row}/{column}") for column in range(20)))
+        await pilot.pause()
+        assert table.max_scroll_x > 0 and table.max_scroll_y > 0
+        rows = parse(table.to_csv())
+        assert len(rows) == 101
+        assert {len(row) for row in rows} == {20}
+        assert rows[-1][-1] == "99/19"
+
+
+async def test_a_value_wider_than_its_column_is_exported_whole() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("A", width=3)
+        table.add_row(Text("a long value"))
+        table.add_row("a long value")
+        await pilot.pause()
+        assert parse(table.to_csv())[1:] == [["a long value"], ["a long value"]]
+
+
+@pytest.mark.parametrize("height", [1, 2, None])
+@pytest.mark.parametrize("cell", ["one\ntwo\nthree", Text("one\ntwo\nthree")])
+async def test_a_multi_line_cell_is_exported_whatever_the_row_height(
+    cell: str | Text, height: int | None
+) -> None:
+    """Textual's own formatter cuts a `str` to the row height."""
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("A")
+        table.add_row(cell, height=height)
+        await pilot.pause()
+        assert parse(table.to_csv())[1] == ["one\ntwo\nthree"]
+
+
+async def test_a_float_keeps_the_precision_the_table_does_not_paint() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("A")
+        table.add_row(1.23456)
+        await pilot.pause()
+        assert parse(table.to_csv())[1] == ["1.23456"]
+
+
+async def test_cells_are_reduced_to_their_text() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_columns("Text", "Content", "Int", "Bool", "None", "Panel")
+        table.add_row(Text("plain"), Content("c"), 7, True, None, Panel("boxed"))
+        await pilot.pause()
+        assert parse(table.to_csv())[1] == ["plain", "c", "7", "True", "", ""]
+
+
+@pytest.mark.parametrize(
+    ("cell", "expected"),
+    [
+        pytest.param("[red]x[/red]", "x", id="tags are styling, not data"),
+        pytest.param("[foo] bar", " bar", id="an unknown tag goes, as on screen"),
+        pytest.param("x[1]", "x[1]", id="not a tag"),
+        pytest.param(":warning: hi", ":warning: hi", id="emoji codes stay"),
+        pytest.param(Text("[foo] bar"), "[foo] bar", id="Text is literal"),
+        pytest.param(Text(":warning: hi"), ":warning: hi", id="so are its codes"),
+    ],
+)
+async def test_only_a_str_cell_has_its_markup_parsed(
+    cell: str | Text, expected: str
+) -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("A")
+        table.add_row(cell)
+        await pilot.pause()
+        assert parse(table.to_csv())[1] == [expected]
+
+
+async def test_the_delimiter_is_configurable_and_decides_what_gets_quoted() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_columns("A", "B")
+        table.add_row(Text("1,234 bytes"), Text("x;y"))
+        await pilot.pause()
+        assert table.to_csv() == 'A,B\n"1,234 bytes",x;y\n'
+        assert table.to_csv(delimiter=";") == 'A;B\n1,234 bytes;"x;y"\n'
+
+
+async def test_awkward_cells_survive_the_quoting() -> None:
+    awkward = ["a,b", 'say "hi"', "one\ntwo"]
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_columns("A", "B", "C")
+        table.add_row(*(Text(value) for value in awkward))
+        await pilot.pause()
+        assert parse(table.to_csv())[1] == awkward
+
+
+async def test_lines_end_in_a_bare_newline() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate(table)
+        await pilot.pause()
+        text = table.to_csv()
+        assert "\r" not in text
+        assert text.count("\n") == len(ROWS) + 1
+
+
+async def test_tooltips_are_only_exported_when_asked_for() -> None:
+    table = Tipped()
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        populate(table)
+        await pilot.pause()
+        assert [row[0] for row in parse(table.to_csv())[1:]] == [
+            "charlie",
+            "Alpha",
+            "bravo",
+        ]
+
+
+async def test_a_cell_without_a_tooltip_exports_its_own_text() -> None:
+    """`Tipped` only tooltips the name column."""
+    table = Tipped()
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        populate(table)
+        await pilot.pause()
+        assert parse(table.to_csv(tooltips=True))[1:] == [
+            ["full c", "100 B", "note"],
+            ["full a", "30 B", "note"],
+            ["full b", "2 B", "note"],
+        ]
+
+
+class AnyTip(DataTable):
+    """Tooltips every cell of its one column with whatever it was given."""
+
+    def __init__(self, tip: Any) -> None:
+        super().__init__()
+        self.tip = tip
+
+    def get_cell_tooltip(self, row_key: RowKey, column_key: ColumnKey) -> Any:
+        return self.tip
+
+
+@pytest.mark.parametrize(
+    ("tip", "expected"),
+    [
+        pytest.param("[b]bold[/b]", "bold", id="markup is stripped"),
+        pytest.param(Text("as text"), "as text", id="Text"),
+        pytest.param(Content("as content"), "as content", id="Content"),
+        pytest.param("[/x] stray", "[/x] stray", id="bad markup stays literal"),
+        pytest.param("one\ntwo", "one\ntwo", id="multi-line stays one field"),
+        pytest.param(Panel("boxed"), "cell", id="not text falls back to the cell"),
+    ],
+)
+async def test_a_tooltip_is_reduced_to_its_text(tip: Any, expected: str) -> None:
+    table = AnyTip(tip)
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        table.add_column("Only")
+        table.add_row(Text("cell"))
+        await pilot.pause()
+        assert parse(table.to_csv(tooltips=True)) == [["Only"], [expected]]
+
+
+async def test_a_tooltip_stands_in_for_a_cell_with_no_text() -> None:
+    table = AnyTip("from the tooltip")
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        table.add_column("Only")
+        table.add_row(Panel("boxed"))
+        await pilot.pause()
+        assert parse(table.to_csv(tooltips=True))[1] == ["from the tooltip"]
+
+
+async def test_shown_row_labels_become_a_leading_column() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        table.add_column("Name")
+        table.add_row(Text("Alpha"), label=Text("1"))
+        table.add_row(Text("bravo"))
+        await pilot.pause()
+        assert parse(table.to_csv()) == [["", "Name"], ["1", "Alpha"], ["", "bravo"]]
+
+
+async def test_hidden_row_labels_are_left_out() -> None:
+    table = DataTable(show_row_labels=False)
+    app = Harness(table)
+    async with app.run_test() as pilot:
+        table.add_column("Name")
+        table.add_row(Text("Alpha"), label=Text("1"))
+        await pilot.pause()
+        assert parse(table.to_csv()) == [["Name"], ["Alpha"]]
+
+
+class Delivering(Harness):
+    def __init__(self) -> None:
+        super().__init__()
+        self.delivered = asyncio.Event()
+
+    def on_delivery_complete(self) -> None:
+        self.delivered.set()
+
+
+async def test_an_export_saved_through_deliver_text_has_one_line_end_per_row(
+    tmp_path: Path,
+) -> None:
+    """This is where a `\\r\\n` from `csv` would double up on Windows."""
+    app = Delivering()
+    async with app.run_test() as pilot:
+        table = app.query_one(DataTable)
+        populate(table)
+        await pilot.pause()
+        app.deliver_text(
+            io.StringIO(table.to_csv()),
+            save_directory=tmp_path,
+            save_filename="export.csv",
+            encoding="utf-8-sig",
+        )
+        await asyncio.wait_for(app.delivered.wait(), timeout=5)
+
+    data = (tmp_path / "export.csv").read_bytes()
+    assert data.startswith(codecs.BOM_UTF8)
+    assert b"\r\r\n" not in data
+    assert len(data.splitlines()) == len(ROWS) + 1

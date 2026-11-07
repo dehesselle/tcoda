@@ -3,7 +3,8 @@
 Textual's `DataTable` does not sort and has no per-cell or per-header
 tooltips: clicking a header posts `HeaderSelected` and stops there, and
 `tooltip` is a property of the whole widget. Both halves turn out to be
-mostly workarounds for the same few Textual internals.
+mostly workarounds for the same few Textual internals. It also has no way to get
+its contents back out as text, so this one adds [CSV export](#export).
 
 ```python
 from tcoda.widgets import DataTable
@@ -91,3 +92,56 @@ class Files(DataTable):
 - **Tooltips need a shown cursor.** Cell and header tooltips alike follow
   `hover_coordinate`, which Textual only tracks while `show_cursor` is on and
   `cursor_type` is not `"none"`.
+
+## Export
+
+`to_csv()` returns everything the table holds as a CSV string. Binding a key to it
+and saving the result are the app's business, and `App.deliver_text` does the
+saving without any dialog:
+
+```python
+self.app.deliver_text(
+    io.StringIO(table.to_csv(delimiter=";", tooltips=True)),
+    save_filename="files.csv",
+    encoding="utf-8-sig",  # Excel only detects UTF-8 with a BOM
+)
+```
+
+- **It exports what the table holds, not what fits on screen.** Rows and columns
+  scrolled out of view are included, and a value is not cut to its column's width
+  or its row's height. Rows come in display order, and headers without their sort
+  indicator. Row labels, when shown, become a leading column under an empty header.
+  The header row is always written, even with `show_header=False`, because a CSV
+  is hard to use without one.
+- **A value is exported whole.** A float keeps its full precision (`1.23456`, where
+  the table paints `1.23`), and `None` is empty. A cell showing `7.2K` as its value
+  exports `7.2K`; see `tooltips` for the full value behind it.
+- **A `str` cell has its markup parsed, so its tags stay out of the CSV**:
+  `[red]x[/red]` exports as `x`. That also means `[foo] bar` loses `[foo]`, as it
+  does on screen. Data from outside the app belongs in a `Text` cell, which is
+  taken literally on screen and in the export.
+- **`tooltips=True` exports a cell's tooltip instead of its text** wherever
+  `get_cell_tooltip` returns one, and the cell's text everywhere else. A column
+  showing `7.2K` or `2 days ago` can export the full value behind it this way.
+  Tooltips are exported as they are, so leave this off for a table whose tooltips
+  say something else about the cell.
+- **A tooltip that is not text counts as no tooltip.** A Rich table, say, has no
+  single value to export, so the cell's own text is used. A `str` tooltip is
+  parsed as markup, as it is when rendered; if that fails it stays literal, since
+  an export evaluates every tooltip and one bad row must not lose the whole export.
+- **A cell with no text of its own exports empty**, such as a Rich `Panel`. With
+  `tooltips=True` it can still export a tooltip.
+- **`delimiter` picks the column separator**: the classic comma, or a semicolon
+  for Excel in locales that use a decimal comma. Quoting is left to `csv.writer`,
+  so only fields containing the delimiter, a quote or a line break get quoted.
+- **Lines end in a bare `\n`**, not the `\r\n` `csv` defaults to. Saving through a
+  text-mode file, as `deliver_text` does, turns `\r\n` into `\r\r\n` on Windows,
+  which spreadsheets show as a blank row after every line.
+- **The table only knows the rows it was given.** If an app shows the first 100
+  of 5,000 rows, the CSV holds those 100 and looks complete. Telling the user
+  that it is partial is up to the app.
+- **Nothing is escaped against formulas.** Excel evaluates a field starting with
+  `=` as a formula, and one starting with `+`, `-` or `@` when an expression
+  follows (`-2+3`, `@SUM(A1)`); a plain `-5` stays a number. An app exporting
+  untrusted data should be aware of this. Escaping here would change the data,
+  and would have to tell numbers from expressions.
