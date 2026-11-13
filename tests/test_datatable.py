@@ -17,6 +17,7 @@ import asyncio
 import codecs
 import csv
 import io
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -891,7 +892,7 @@ class Delivering(Harness):
 
 
 async def test_an_export_saved_through_deliver_text_has_one_line_end_per_row(
-    tmp_path: Path,
+    tmp_path: Path, join_deliveries: Callable[[], None]
 ) -> None:
     """This is where a `\\r\\n` from `csv` would double up on Windows."""
     app = Delivering()
@@ -906,6 +907,7 @@ async def test_an_export_saved_through_deliver_text_has_one_line_end_per_row(
             encoding="utf-8-sig",
         )
         await asyncio.wait_for(app.delivered.wait(), timeout=5)
+        join_deliveries()
 
     data = (tmp_path / "export.csv").read_bytes()
     assert data.startswith(codecs.BOM_UTF8)

@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -37,3 +39,21 @@ def isolated_settings(tmp_path: Path) -> None:
 @pytest.fixture
 def settings_path(tmp_path: Path) -> Path:
     return tmp_path / "settings.json"
+
+
+@pytest.fixture
+def join_deliveries() -> Callable[[], None]:
+    """Wait until every file Textual is delivering has been closed.
+
+    Textual posts `DeliveryComplete` from inside the `with open(...)` that
+    writes the file, so a test that reads the file on hearing of it can find
+    it still unflushed. Its writer thread ending is the only sign that the
+    file is complete.
+    """
+
+    def join() -> None:
+        for thread in threading.enumerate():
+            if thread.name.endswith("(save_file_thread)"):
+                thread.join(timeout=5)
+
+    return join

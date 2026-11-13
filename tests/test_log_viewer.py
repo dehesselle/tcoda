@@ -1055,7 +1055,7 @@ async def test_to_text_holds_the_whole_buffer_whatever_the_filters(
 
 
 async def test_export_saves_the_buffer_and_says_where(
-    logger_name: str, tmp_path: Path
+    logger_name: str, tmp_path: Path, join_deliveries: Callable[[], None]
 ) -> None:
     class Titled(Harness):
         TITLE = "log test"
@@ -1067,6 +1067,7 @@ async def test_export_saves_the_buffer_and_says_where(
         viewer = app.query_one(LogViewer)
         viewer.export(save_directory=tmp_path)
         await wait_for(pilot, lambda: bool(_notifications(app)))
+        join_deliveries()
 
         [saved] = tmp_path.iterdir()
         assert re.fullmatch(r"log_test_\d{8}-\d{6}\.log", saved.name)

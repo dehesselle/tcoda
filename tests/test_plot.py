@@ -1007,7 +1007,11 @@ async def test_a_reset_settles_too() -> None:
         assert len(app.settled) == 2
 
 
-async def test_limits_set_before_a_move_settles_keep_the_view() -> None:
+async def test_limits_set_before_a_move_settles_keep_the_view(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Long enough that a slow test run cannot settle before the refresh.
+    monkeypatch.setattr(Plot, "SETTLE_DELAY", 1.0)
     app = Settling()
     async with app.run_test(size=SIZE) as pilot:
         plot = app.query_one(Plot)
@@ -1019,7 +1023,7 @@ async def test_limits_set_before_a_move_settles_keep_the_view() -> None:
         plot.x_limits = (0, 12)
         await pilot.pause()
         assert plot.x_range == zoomed
-        await pilot.pause(Plot.SETTLE_DELAY * 3)
+        await pilot.pause(Plot.SETTLE_DELAY * 1.5)
         await pilot.press("r")
         assert plot.x_range == (0.0, 12.0)
 
