@@ -12,11 +12,13 @@ wait needs a number::
     ...
     countdown.remaining = 30      # counts down
     countdown.refreshing = True   # spins until cleared
+    countdown.paused = True       # a glyph instead of the number
     countdown.display = False     # gone entirely
 
 `display` is deliberately the only way to hide it: an empty render would mean
 "nothing to say", which is not the same thing as a genuine zero, and a widget
-that conflates the two cannot express either.
+that conflates the two cannot express either. Nor is `paused` a way to hide
+it: it says the count has stopped, which is something to show.
 """
 
 from __future__ import annotations
@@ -29,7 +31,12 @@ from textual.widgets import Static
 
 
 class Countdown(Static):
-    """Seconds remaining, with a braille spinner while `refreshing`."""
+    """Seconds remaining, with a braille spinner while `refreshing`.
+
+    While `paused`, `PAUSED_GLYPH` stands in for the number. The spinner still
+    wins: something in flight is worth knowing about whether or not the count
+    has stopped.
+    """
 
     DEFAULT_CSS = """
     Countdown {
@@ -45,13 +52,17 @@ class Countdown(Static):
     SPINNER: ClassVar[str] = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
     #: Seconds between spinner frames.
     SPINNER_INTERVAL: ClassVar[float] = 0.1
+    #: Shown instead of the number while `paused`. One cell wide and in most
+    #: monospace fonts, which a pause or sleep emoji is not.
+    PAUSED_GLYPH: ClassVar[str] = "☾"
 
-    # layout=True on both: the widget is `width: auto`, and a plain reactive
+    # layout=True on each: the widget is `width: auto`, and a plain reactive
     # only repaints in place -- "100" going to "99", or a number giving way to
-    # a one-cell spinner, would render clipped or leave a stale trailing
+    # a one-cell spinner or glyph, would render clipped or leave a stale trailing
     # column until something else (a terminal resize, say) forced a relayout.
     remaining: reactive[int] = reactive(0, layout=True)
     refreshing: reactive[bool] = reactive(False, layout=True)
+    paused: reactive[bool] = reactive(False, layout=True)
 
     def __init__(
         self,
@@ -78,6 +89,8 @@ class Countdown(Static):
     def render(self) -> str:
         if self.refreshing:
             return self.SPINNER[self._frame % len(self.SPINNER)]
+        if self.paused:
+            return self.PAUSED_GLYPH
         # Zero renders "0", not "". Reaching zero is a real state, and the
         # caller hides the widget with `display` when it has nothing to show.
         return str(min(self.remaining, self.MAX_SECONDS))

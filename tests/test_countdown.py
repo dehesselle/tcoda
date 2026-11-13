@@ -68,6 +68,49 @@ async def test_remaining_relayouts_so_a_narrower_value_is_not_left_clipped() -> 
         assert countdown.outer_size.width == 1
 
 
+# --------------------------------------------------------------------- paused
+
+
+async def test_paused_shows_the_glyph_instead_of_the_number() -> None:
+    app = Harness(remaining=42)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        countdown = app.query_one(Countdown)
+        countdown.paused = True
+        await pilot.pause()
+        assert countdown.render() == Countdown.PAUSED_GLYPH
+        assert countdown.outer_size.width == 1
+
+
+async def test_unpausing_shows_the_number_again() -> None:
+    app = Harness(remaining=42)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        countdown = app.query_one(Countdown)
+        countdown.paused = True
+        await pilot.pause()
+        countdown.paused = False
+        await pilot.pause()
+        assert countdown.render() == "42"
+        assert countdown.outer_size.width == 2
+
+
+async def test_the_spinner_wins_over_the_paused_glyph() -> None:
+    """Something in flight is worth knowing about whether or not the count
+    has stopped."""
+    app = Harness(remaining=42)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        countdown = app.query_one(Countdown)
+        countdown.paused = True
+        countdown.refreshing = True
+        await pilot.pause()
+        assert countdown.render() in Countdown.SPINNER
+        countdown.refreshing = False
+        await pilot.pause()
+        assert countdown.render() == Countdown.PAUSED_GLYPH
+
+
 # -------------------------------------------------------------------- spinner
 
 
