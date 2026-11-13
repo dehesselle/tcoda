@@ -11,7 +11,7 @@ import asyncio
 import logging
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import textual
 from textual import on, work
@@ -25,10 +25,11 @@ import tcoda
 from tcoda.chords import ChordMixin
 from tcoda.demo._browser import ExtensionTable, FileInfo, FileTable, Sidebar, scan
 from tcoda.demo._filter import FilterDialog
-from tcoda.demo._settings import AUTO_REFRESH, REFRESH_INTERVAL
+from tcoda.demo._settings import AUTO_REFRESH, PAUSE_AFTER, REFRESH_INTERVAL
 from tcoda.demo._sizes import SizesDialog
 from tcoda.demo._timeline import TimelineDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
+from tcoda.input_idle import InputIdleMixin
 from tcoda.settings import config
 from tcoda.terminal_title import TerminalTitleMixin
 from tcoda.widgets import (
@@ -266,6 +267,13 @@ class BrowserScreen(Screen[None]):
         countdown = self.query_one(Countdown)
         if not config.get(AUTO_REFRESH) or countdown.refreshing:
             return
+        # Nobody has been here for a while: stop polling, and say so rather
+        # than freeze the number. Any input picks it up on the next tick.
+        idle = cast(InputIdleMixin, self.app).seconds_since_input
+        pause_after = config.get(PAUSE_AFTER)
+        countdown.paused = 0 < pause_after < idle
+        if countdown.paused:
+            return
         countdown.remaining = max(0, countdown.remaining - 1)
         if countdown.remaining == 0:
             self.action_refresh()
@@ -390,7 +398,7 @@ class BrowserScreen(Screen[None]):
         self.app.push_screen(SettingsDialog())
 
 
-class DemoApp(TerminalTitleMixin, ChordMixin, App[None]):
+class DemoApp(InputIdleMixin, TerminalTitleMixin, ChordMixin, App[None]):
     """Run with `python -m tcoda`."""
 
     TITLE = "tcoda demo"

@@ -134,7 +134,8 @@ default instead.
 `tcoda/__init__.py` is deliberately empty of imports: pulling in `tcoda` must not
 drag Textual (or a config file read) into a module that only wanted the
 version. Consumers import from `tcoda.widgets`, `tcoda.dialogs`, `tcoda.settings`,
-`tcoda.chords`, `tcoda.terminal_title`, `tcoda.log_sink` or `tcoda.plot`.
+`tcoda.chords`, `tcoda.terminal_title`, `tcoda.input_idle`, `tcoda.log_sink`
+or `tcoda.plot`.
 
 The same rule applies between subpackages: `tcoda.widgets` stays importable
 without the settings machinery, so `SettingsMenuItem` imports

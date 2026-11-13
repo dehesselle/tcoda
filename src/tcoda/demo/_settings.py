@@ -28,6 +28,14 @@ REFRESH_INTERVAL = Setting(
     default=30,
 )
 
+PAUSE_AFTER = Setting(
+    key="pause_after",
+    label="pause after",
+    description="Seconds without input before auto-refresh pauses; 0 never pauses.",
+    group="Demo.Refresh",
+    default=120,
+)
+
 SIZE_UNITS = Setting(
     key="size_units",
     label="size units",
@@ -39,7 +47,7 @@ SIZE_UNITS = Setting(
 
 
 def _reset() -> None:
-    for setting in (AUTO_REFRESH, REFRESH_INTERVAL, SIZE_UNITS):
+    for setting in (AUTO_REFRESH, REFRESH_INTERVAL, PAUSE_AFTER, SIZE_UNITS):
         config.reset(setting)
 
 
@@ -54,4 +62,4 @@ RESET = SettingAction(
 
 #: Everything declared here. The tests re-register these: their fixture gives
 #: each test an empty registry, and a module is only imported once.
-DEMO_SETTINGS = (AUTO_REFRESH, REFRESH_INTERVAL, SIZE_UNITS, RESET)
+DEMO_SETTINGS = (AUTO_REFRESH, REFRESH_INTERVAL, PAUSE_AFTER, SIZE_UNITS, RESET)

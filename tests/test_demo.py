@@ -17,7 +17,12 @@ from tcoda.demo import DemoApp
 from tcoda.demo._app import BrowserScreen
 from tcoda.demo._browser import ExtensionTable, FileTable, format_age, format_size
 from tcoda.demo._filter import FilterDialog
-from tcoda.demo._settings import AUTO_REFRESH, DEMO_SETTINGS, SIZE_UNITS
+from tcoda.demo._settings import (
+    AUTO_REFRESH,
+    DEMO_SETTINGS,
+    PAUSE_AFTER,
+    SIZE_UNITS,
+)
 from tcoda.demo._sizes import SizesDialog, sizes_by_extension
 from tcoda.demo._timeline import SHORTEST_SPAN, TimelineDialog
 from tcoda.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
@@ -282,6 +287,24 @@ async def test_the_countdown_reaching_zero_refreshes() -> None:
         await pilot.pause()
         assert not countdown.refreshing
         assert countdown.remaining == 30
+
+
+async def test_the_countdown_pauses_while_nobody_is_there() -> None:
+    app = DemoApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, BrowserScreen)
+        countdown = screen.query_one(Countdown)
+        countdown.remaining = 10
+        app._last_input = time.monotonic() - config.get(PAUSE_AFTER) - 1
+        screen._tick()
+        assert countdown.paused
+        assert countdown.remaining == 10
+        await pilot.press("x")
+        screen._tick()
+        assert not countdown.paused
+        assert countdown.remaining == 9
 
 
 async def test_settings_take_effect_when_the_screen_resumes() -> None:

@@ -18,9 +18,10 @@ natural place. All of it is ordinary consumer code, so
 | [DataTable](widgets/DataTable.md) | The file list, and the Extensions tab beside it. Click a header to sort. Size and Modified show rounded values but rank by the exact bytes and mtime. Hover a cell for its tooltip. |
 | [TabbedContent](widgets/TabbedContent.md) | Above the file list: Files (`f`), Extensions (`e`) and a disabled Preview (`p`). The letters work once the focus is right of the tree, and take it into the tab. Focus the tab bar and ←/→ walk it instead. |
 | [Footer](widgets/Footer.md) | Bottom row: `F9`, `F1` and `^q` pinned, the other keys sorted, and a countdown plus a file count in the status corner. |
-| [Countdown](widgets/Countdown.md) | Footer status corner. It spins during an auto-refresh. Turning auto-refresh off in the settings hides it. |
+| [Countdown](widgets/Countdown.md) | Footer status corner. It spins during an auto-refresh, and shows `☾` while the refresh is paused. Turning auto-refresh off in the settings hides it. |
 | [LogViewer](widgets/LogViewer.md) | F1. Four `tcoda.demo.*` loggers write to it, so the source filter has something to filter. |
 | [Chords](chords.md) and [ChordViewer](widgets/ChordViewer.md) | `ctrl+k` then a pause lists every chord: `s …` sorts, `d …` opens each dialog, `r` refreshes, `t` changes theme. |
+| [Input idle](input_idle.md) | Auto-refresh pauses after two minutes without a key press, click or scroll (Demo.Refresh → pause after), and the countdown says so. Any input resumes it; moving the mouse does not. |
 | [Terminal title](terminal_title.md) | The terminal's window or tab title reads "tcoda demo" while the demo runs, and goes back to what it was on exit. |
 | [ConfirmDialog](dialogs/ConfirmDialog.md) | Dialogs → Confirm, and Delete files (the `danger=True, focus_cancel=True` variant, which deletes nothing). |
 | [Dialog](dialogs/Dialog.md) | Dialogs → Filter (F2): `FilterDialog`, the demo's own dialog on the shared chrome. |
