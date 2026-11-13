@@ -9,16 +9,20 @@ that the panel actually paints above other content once revealed."""
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import re
 import threading
 import uuid
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.notifications import Notification
 from textual.pilot import Pilot
 from textual.screen import Screen
-from textual.widgets import Input, RichLog, Select, Static
+from textual.widgets import Button, Input, RichLog, Select, Static
 
 from tcoda.log_sink import InMemoryLogHandler
 from tcoda.widgets import TOGGLE_ACTION, LogViewer
@@ -736,6 +740,7 @@ async def test_concealed_panel_contributes_nothing_to_the_focus_chain(
         chain = app.screen.focus_chain
         assert app.query_one("#log-viewer-level") not in chain
         assert app.query_one("#log-viewer-sources") not in chain
+        assert app.query_one("#log-viewer-export") not in chain
         assert app.query_one("#log-viewer-log") not in chain
 
 
@@ -748,6 +753,7 @@ async def test_revealed_panel_puts_its_controls_back_in_the_focus_chain(
         chain = app.screen.focus_chain
         assert app.query_one("#log-viewer-level") in chain
         assert app.query_one("#log-viewer-sources") in chain
+        assert app.query_one("#log-viewer-export") in chain
         assert app.query_one("#log-viewer-log") in chain
 
 
@@ -806,7 +812,9 @@ async def test_a_concealed_panels_controls_cannot_be_focused_from_code(
         assert app.focused is app.screen.query_one("#field", Input)
 
 
-@pytest.mark.parametrize("control", ["#log-viewer-level", "#log-viewer-log"])
+@pytest.mark.parametrize(
+    "control", ["#log-viewer-level", "#log-viewer-export", "#log-viewer-log"]
+)
 async def test_concealing_takes_the_focus_away_from_the_panels_controls(
     logger_name: str, control: str
 ) -> None:
@@ -988,3 +996,143 @@ async def test_two_log_viewers_do_not_double_register_the_layer(
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert list(app.screen.styles.layers).count(_LAYER) == 1
+
+
+# ------------------------------------------------------------------ export
+
+
+async def wait_for(pilot: Pilot[None], condition: Callable[[], bool]) -> None:
+    """Export writes on a thread and reports back through the app, so the
+    outcome takes a moment to arrive."""
+    for _ in range(100):
+        if condition():
+            return
+        await settle(pilot, rounds=1)
+    raise AssertionError("timed out")
+
+
+def _notifications(app: App[None]) -> list[Notification]:
+    return list(app._notifications)
+
+
+async def test_to_text_holds_the_whole_buffer_whatever_the_filters(
+    logger_name: str,
+) -> None:
+    """What the panel hides is still in the buffer, and the file is for
+    finding out later what happened, so it gets all of it."""
+    handler = InMemoryLogHandler()
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+
+    class GivenHandlerHarness(App[None]):
+        def compose(self) -> ComposeResult:
+            yield LogViewer(handler=handler)
+
+    app = GivenHandlerHarness()
+    try:
+        async with app.run_test(size=(80, 24)) as pilot:
+            viewer = app.query_one(LogViewer)
+            _source(logger_name, "hidden").info("from a hidden source")
+            logger.debug("below the level")
+            logger.warning("first line\nsecond line")
+            viewer.set_source_hidden(f"{logger_name}.hidden", True)
+            await settle(pilot)
+
+            assert "from a hidden source" not in _log_text(app)
+            assert "below the level" not in _log_text(app)
+            text = viewer.to_text()
+    finally:
+        logger.removeHandler(handler)
+
+    date = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}"
+    assert re.fullmatch(
+        f"{date} INFO     {logger_name}.hidden: from a hidden source\n"
+        f"{date} DEBUG    {logger_name}: below the level\n"
+        f"{date} WARNING  {logger_name}: first line\nsecond line\n",
+        text,
+    )
+
+
+async def test_export_saves_the_buffer_and_says_where(
+    logger_name: str, tmp_path: Path
+) -> None:
+    class Titled(Harness):
+        TITLE = "log test"
+
+    app = Titled(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        logging.getLogger(logger_name).info("worth keeping")
+        await settle(pilot)
+        viewer = app.query_one(LogViewer)
+        viewer.export(save_directory=tmp_path)
+        await wait_for(pilot, lambda: bool(_notifications(app)))
+
+        [saved] = tmp_path.iterdir()
+        assert re.fullmatch(r"log_test_\d{8}-\d{6}\.log", saved.name)
+        assert saved.read_text(encoding="utf-8") == viewer.to_text()
+        assert "worth keeping" in viewer.to_text()
+        [notification] = _notifications(app)
+        assert notification.severity == "information"
+        assert str(saved) in notification.message
+
+
+async def test_a_failed_export_says_so(logger_name: str, tmp_path: Path) -> None:
+    not_a_directory = tmp_path / "file"
+    not_a_directory.write_text("", encoding="utf-8")
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.query_one(LogViewer).export(save_directory=not_a_directory)
+        await wait_for(pilot, lambda: bool(_notifications(app)))
+        [notification] = _notifications(app)
+        assert notification.severity == "error"
+
+
+async def test_export_leaves_other_deliveries_to_the_app(
+    logger_name: str, tmp_path: Path
+) -> None:
+    app = Harness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.deliver_text(io.StringIO("not a log"), save_directory=tmp_path)
+        await wait_for(pilot, lambda: any(tmp_path.iterdir()))
+        await settle(pilot)
+        assert _notifications(app) == []
+
+
+@pytest.mark.parametrize(
+    ("title", "stem"),
+    [("my app/x:y", "my_app_x_y"), ("tcoda-demo.v2", "tcoda-demo.v2"), (None, "")],
+)
+async def test_export_filename_is_the_app_title_made_safe(
+    logger_name: str, title: str | None, stem: str
+) -> None:
+    class NamedHarness(Harness):
+        TITLE = title
+
+    app = NamedHarness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        name = app.query_one(LogViewer).export_filename()
+    # Without a `TITLE`, the class name.
+    assert re.fullmatch(
+        rf"{re.escape(stem or 'NamedHarness')}_\d{{8}}-\d{{6}}\.log", name
+    )
+
+
+async def test_the_export_button_saves_and_keeps_its_press_to_itself(
+    logger_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("textual.app.user_downloads_path", lambda: tmp_path)
+    pressed: list[Button.Pressed] = []
+
+    class ListeningHarness(Harness):
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            pressed.append(event)
+
+    app = ListeningHarness(logger=logger_name)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await reveal(pilot)
+        await pilot.click("#log-viewer-export")
+        await wait_for(pilot, lambda: bool(_notifications(app)))
+        assert len(list(tmp_path.iterdir())) == 1
+        assert pressed == []

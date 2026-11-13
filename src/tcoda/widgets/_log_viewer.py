@@ -10,21 +10,25 @@ logfile, no tailing.
 independent of any widget being mounted, so nothing emitted before a
 `LogViewer` exists is lost -- it is replayed on mount. Filtering by level and
 source happens here, at render time, against that buffer -- the sink itself
-stays unfiltered.
+stays unfiltered. Export writes that whole buffer to a file, filters or not:
+for an app without a logfile, the panel may be the only record there is.
 """
 
 from __future__ import annotations
 
+import io
 import logging
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import RichLog, Select
+from textual.widgets import Button, RichLog, Select
 
 from tcoda.log_sink import InMemoryLogHandler, LogEntry
 from tcoda.widgets._layers import install_layer
@@ -32,6 +36,8 @@ from tcoda.widgets._screen_keys import install_screen_key, uninstall_screen_key
 from tcoda.widgets._tree_select import TreeSelect
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from textual.screen import Screen
 
 #: The action `LogViewer` installs on its screen -- see `OPEN_ACTION` in
@@ -50,6 +56,10 @@ _LEVELS: list[tuple[str, int]] = [
     ("Error", logging.ERROR),
     ("Critical", logging.CRITICAL),
 ]
+
+#: Anything outside this set is replaced in the app's name before it becomes
+#: part of a filename.
+_UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9._-]")
 
 
 class LogViewer(Widget, can_focus=False):
@@ -79,6 +89,33 @@ class LogViewer(Widget, can_focus=False):
     LogViewer > #log-viewer-toolbar > #log-viewer-sources {
         width: 24;
         margin: 0 0 0 1;
+    }
+    /* Dressed as the dropdowns' triggers rather than as a button, so the
+       toolbar reads as one row of like controls. */
+    LogViewer > #log-viewer-toolbar > #log-viewer-export {
+        width: auto;
+        min-width: 0;
+        height: 1;
+        margin: 0 0 0 1;
+        padding: 0;
+        border: none;
+        color: $foreground;
+        background: $surface;
+        text-style: none;
+        pointer: pointer;
+        &:focus {
+            text-style: none;
+            background-tint: $foreground 5%;
+        }
+        &:hover {
+            border: none;
+            background: $surface;
+        }
+        &.-active {
+            border: none;
+            background: $surface;
+            tint: transparent;
+        }
     }
     LogViewer > #log-viewer-log {
         height: 1fr;
@@ -154,6 +191,8 @@ class LogViewer(Widget, can_focus=False):
         # of a re-render asks and walking the tree each time would add up.
         self._hidden_sources: set[str] = set()
         self._known_sources: set[str] = set()
+        # Delivery keys of exports still being written, see `_on_app_message`.
+        self._pending_exports: set[str] = set()
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log-viewer-toolbar", disabled=not self.revealed):
@@ -169,6 +208,7 @@ class LogViewer(Widget, can_focus=False):
                 compact=True,
                 id="log-viewer-sources",
             )
+            yield Button("Export", id="log-viewer-export", compact=True)
         # `wrap=True`: a `Log` widget only ever crops a long line to the
         # viewport width, requiring horizontal scrolling to read the rest --
         # painful for the very thing this exists to show in full, a long log
@@ -198,8 +238,13 @@ class LogViewer(Widget, can_focus=False):
         self._attach_handler()
         self._render_log()
         self._handler.subscribe(self._on_sink_entry)
+        # How an export went is only ever told to the app: `DeliveryComplete`
+        # and `DeliveryFailed` are sent to it directly and do not bubble.
+        # Every message the app processes is published here, though.
+        self.app.message_signal.subscribe(self, self._on_app_message)
 
     def on_unmount(self) -> None:
+        self.app.message_signal.unsubscribe(self)
         uninstall_screen_key(self._key_screen, self, TOGGLE_ACTION)
         self._handler.unsubscribe(self._on_sink_entry)
         if self._owns_handler:
@@ -244,18 +289,23 @@ class LogViewer(Widget, can_focus=False):
         )
 
     @staticmethod
-    def _display_line(entry: LogEntry) -> str:
+    def _format_line(entry: LogEntry, time_format: str) -> str:
         """Timestamp, level and source in front of the message -- `line`
         itself deliberately carries none of them (see `tcoda.log_sink`), so
-        composing the full display text is this widget's job, not the
-        sink's."""
+        composing the full text is this widget's job, not the sink's.
+        `time_format` is a strftime pattern ending in `%f`, which is cut to
+        milliseconds."""
         # entry.created is a naive Unix timestamp (record.created); routing
         # it through an explicit UTC-aware instant before converting to the
         # local zone is what satisfies ruff's DTZ006 without changing the
         # displayed wall-clock time at all.
         local_time = datetime.fromtimestamp(entry.created, tz=UTC).astimezone()
-        timestamp = local_time.strftime("%H:%M:%S.%f")[:-3]
+        timestamp = local_time.strftime(time_format)[:-3]
         return f"{timestamp} {entry.levelname:<8} {entry.source}: {entry.line}"
+
+    @classmethod
+    def _display_line(cls, entry: LogEntry) -> str:
+        return cls._format_line(entry, "%H:%M:%S.%f")
 
     def _render_log(self) -> None:
         log = self.query_one("#log-viewer-log", RichLog)
@@ -350,6 +400,69 @@ class LogViewer(Widget, can_focus=False):
         )
         self._sync_hidden_sources()
         self._render_log()
+
+    # ----------------------------------------------------------------- export
+
+    def to_text(self) -> str:
+        """Everything the buffer holds, one entry per line, whatever the level
+        and source filters show. Each line carries the date too, as a file
+        outlives the day it was written."""
+        return "".join(
+            self._format_line(entry, "%Y-%m-%d %H:%M:%S.%f") + "\n"
+            for entry in self._handler.entries()
+        )
+
+    def export_filename(self) -> str:
+        """The name `export` saves under: the app's `TITLE` (or its class name)
+        and the local time, as in `my_app_20261113-213045.log`. Override to
+        name the file differently."""
+        # `TITLE` rather than `title`, which apps reuse for whatever they
+        # show at the moment.
+        name = self.app.TITLE or type(self.app).__name__
+        stem = _UNSAFE_FILENAME_CHARS.sub("_", name)
+        # No colons, which Windows does not allow in a filename.
+        return f"{stem}_{datetime.now().astimezone():%Y%m%d-%H%M%S}.log"
+
+    def export(self, *, save_directory: str | Path | None = None) -> str:
+        """Save `to_text()` through `App.deliver_text`: to `save_directory`,
+        by default the user's downloads directory, or as a download in the
+        browser when served on the web. A notification tells how it went.
+        Returns the delivery key."""
+        key = self.app.deliver_text(
+            io.StringIO(self.to_text()),
+            save_directory=save_directory,
+            save_filename=self.export_filename(),
+            encoding="utf-8",
+            mime_type="text/plain",
+        )
+        self._pending_exports.add(key)
+        return key
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id != "log-viewer-export":
+            return
+        event.stop()
+        self.export()
+
+    def _on_app_message(self, message: Message) -> None:
+        if isinstance(message, events.DeliveryComplete):
+            if message.key not in self._pending_exports:
+                return
+            self._pending_exports.discard(message.key)
+            saved = (
+                "Saved log" if message.path is None else f"Saved log to {message.path}"
+            )
+            self.notify(saved, title="Log", markup=False)
+        elif isinstance(message, events.DeliveryFailed):
+            if message.key not in self._pending_exports:
+                return
+            self._pending_exports.discard(message.key)
+            self.notify(
+                f"Failed to save log: {message.exception}",
+                title="Log",
+                severity="error",
+                markup=False,
+            )
 
     # ---------------------------------------------------------------- drive
 

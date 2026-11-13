@@ -3,7 +3,8 @@
 A panel that slides down from the top over existing content, showing the
 last 30,000 lines a program has written through the stdlib `logging` module
 — no logfile, no tailing. A level dropdown (default: info and above) and a
-tree of sources with checkboxes (default: all visible) narrow what's shown.
+tree of sources with checkboxes (default: all visible) narrow what's shown,
+and **Export** saves the log to a file.
 
 ```python
 from tcoda.widgets import LogViewer
@@ -71,6 +72,32 @@ class MainScreen(Screen):
   concealed, and keep up with the log all the same. The panel's own `disabled`
   stays yours, and a panel disabled that way stays out of reach once revealed
   too.
+
+## Export
+
+The **Export** button saves the log to a file, which matters most for an app
+without a logfile of its own: whatever caught your eye in the panel would
+otherwise be gone when the app exits. `export()` does the same from code.
+
+- **It saves the whole buffer, whatever the filters show.** Lines below the
+  level dropdown and from hidden sources are included, as far as the buffer
+  holds them, since the file is for working out later what happened around
+  what you saw. `to_text()` returns that same text.
+- **Each line is the panel's, with the date in front**:
+  `2026-11-13 21:29:56.123 INFO     app.net: connected`. A message that spans
+  several lines, such as a traceback, is written as it is.
+- **The file is named after the app and the time**, as in
+  `my_app_20261113-213045.log`. The name is the app's `TITLE` or, without
+  one, its class name, with anything other than letters, digits, `.`, `_` and
+  `-` turned into `_`. It does not use `title`, which apps often change to
+  show what is open. Override `export_filename()` to name it differently.
+- **Saving goes through `App.deliver_text`**, as for a
+  [`DataTable`](DataTable.md#export) export: to the user's downloads
+  directory, or as a download in the browser when the app is served on the
+  web. `export(save_directory=...)` saves somewhere else. The file is written
+  on a thread, and a notification says where it went or why it failed.
+- **The button's press stays inside the panel**, so a host's own
+  `on_button_pressed` never sees it.
 
 ## The sink: `tcoda.log_sink`
 
