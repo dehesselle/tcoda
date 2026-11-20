@@ -32,7 +32,10 @@ class MyApp(ChordMixin, App[None]):
   not stop anyone typing a g.
 - **A key that continues no chord abandons it and is swallowed**, `escape`
   included, rather than being typed halfway through what was meant as a
-  command.
+  command. A modifier pressed on its own is the exception: terminals using
+  the kitty keyboard protocol report the Shift on the way to `?` (or the AltGr
+  on the way to `@`) as a key of its own, and that neither continues nor
+  abandons a chord.
 - **`CHORD_TIMEOUT` drops the steps typed so far**; it does not replay them to
   the focused widget.
 - **The [footer](widgets/Footer.md) shows a pending chord** in its status

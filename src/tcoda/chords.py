@@ -50,6 +50,23 @@ else:
 
 type Steps = tuple[str, ...]
 
+#: What a modifier pressed on its own arrives as. Textual's Linux driver asks
+#: the terminal for the kitty keyboard protocol with "report all keys", so
+#: Shift on the way to `?`, or AltGr on the way to `@`, is a key press of its
+#: own there. Named here rather than taken from Textual, where the list is
+#: private. A binding on one of these could never be typed as a step anyway.
+_MODIFIER_KEYS = frozenset(
+    {
+        *(
+            f"{side}_{modifier}"
+            for side in ("left", "right")
+            for modifier in ("shift", "control", "alt", "super", "hyper", "meta")
+        ),
+        "iso_level3_shift",
+        "iso_level5_shift",
+    }
+)
+
 
 def chord_steps(key: str) -> Steps:
     """Split a binding key into its steps, normalised the way `event.key` is.
@@ -138,6 +155,12 @@ class ChordMixin(_Base):
             self._cancel_chord()
             pending = ()
 
+        if event.key in _MODIFIER_KEYS:
+            # Only on the way to the next step: it neither continues nor
+            # abandons a chord, and leaves the steps, the hold and the timer
+            # alone. With no chord pending it is none of our business.
+            return bool(pending)
+
         # `split()` rather than a 1-tuple: clicking a chord in the footer
         # simulates its whole key, "ctrl+k ctrl+s", as a single event.
         steps = (*pending, *chord_steps(event.key))
@@ -161,7 +184,8 @@ class ChordMixin(_Base):
         if pending:
             # Any key that continues no chord abandons it, escape included --
             # and is swallowed, as VSCode does, rather than typed half-way
-            # through what the user thought was a command.
+            # through what the user thought was a command. A bare modifier
+            # was let through above.
             self._cancel_chord()
             return True
         return False

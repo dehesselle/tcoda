@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Input, Static
@@ -95,6 +96,46 @@ async def test_escape_abandons_a_chord() -> None:
         await pilot.press("ctrl+k", "escape", "ctrl+s")
         assert app.fired == []
         assert app.pending_chord == ()
+
+
+async def test_a_bare_modifier_key_neither_continues_nor_abandons_a_chord() -> None:
+    # Under the kitty keyboard protocol the Shift on the way to "?" arrives
+    # as a key of its own.
+    for modifier in ("left_shift", "right_shift", "iso_level3_shift"):
+        app = Harness()
+        app.CHORD_TIMEOUT = 5
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            timer = app._chord_timer
+            await pilot.press(modifier)
+            assert app.pending_chord == ("ctrl+k",)
+            assert app._chord_timer is timer
+            await pilot.press("?")
+            assert app.fired == ["help"]
+            # Before a middle step, too.
+            await pilot.press("ctrl+k", modifier, "x", "y")
+            assert app.fired == ["help", "xy"]
+
+
+class KeyLogging(Harness):
+    def __init__(self) -> None:
+        super().__init__()
+        self.keys: list[str] = []
+
+    def on_key(self, event: events.Key) -> None:
+        self.keys.append(event.key)
+
+
+async def test_a_bare_modifier_key_with_no_chord_pending_goes_on() -> None:
+    app = KeyLogging()
+    async with app.run_test() as pilot:
+        await pilot.press("left_shift")
+        assert app.pending_chord == ()
+        assert app.fired == []
+        assert app.keys == ["left_shift"]
+        # While a chord is pending, it is swallowed.
+        await pilot.press("ctrl+k", "left_shift")
+        assert app.keys == ["left_shift"]
 
 
 async def test_a_chord_times_out() -> None:
@@ -309,6 +350,20 @@ async def test_backspace_steps_back_only_while_held() -> None:
         app.hold_chord()
         await pilot.press("backspace")
         assert app.pending_chord == ()
+
+
+async def test_a_bare_modifier_key_keeps_a_held_chord_held() -> None:
+    app = Harness()
+    async with app.run_test() as pilot:
+        await pilot.press("ctrl+k", "x")
+        app.hold_chord()
+        await pilot.press("left_shift")
+        assert app.pending_chord == ("ctrl+k", "x")
+        assert app._chord_held
+        await pilot.press("backspace")
+        assert app.pending_chord == ("ctrl+k",)
+        await pilot.press("ctrl+s")
+        assert app.fired == ["save"]
 
 
 class Erasing(Harness):
